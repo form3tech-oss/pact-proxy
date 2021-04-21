@@ -1,0 +1,15 @@
+language: go
+go:
+- 1.16.x
+env:
+  global:
+  - GO111MODULE=on
+cache:
+  directories:
+  - "$GOPATH/pkg/mod"
+  - "$HOME/.cache/go-build"
+install:
+- if [[ -a .git/shallow ]]; then git fetch --unshallow --tags; fi
+script:
+- make test
+- make docker-package
