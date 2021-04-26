@@ -11,4 +11,5 @@ cache:
 install:
 - if [[ -a .git/shallow ]]; then git fetch --unshallow --tags; fi
 script:
+- make test
 - make docker-package
