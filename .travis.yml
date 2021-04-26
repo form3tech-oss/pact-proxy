@@ -9,4 +9,4 @@ cache:
     - $GOPATH/pkg/mod
     - $HOME/.cache/go-build
 script:
-  - docker-package
+  - make docker-package
