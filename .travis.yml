@@ -4,15 +4,11 @@ go:
 env:
   global:
   - GO111MODULE=on
-  - secure: p+8rX2bf8RhqYjqCDki+e+AI1yVSXnd1KcbQHsfmpLuVGvMFfcFMZkFg2W2/5/99OuYGhyzLHBv5Q8WTISUXTYimDlzEUoMOhbLATLmA/ZzPcKVpqXzfN8+U6kJQ7pXqjB7PUhaFlLMQhFgQRyLh0XDPqXDtltQvmVxGzzsgL14hOzoOtpV2fxCqMWvQ9uZBm+FysDMxQeVls9cZ926GZwntUCUbE3atxLk+BzjAmpwS26WRSeVX8ifGF+RPcU6d/dLvKd/ZIFjGoDzLibpo6v31d3ifanxMBCQYK8Pj+WQuUxOyjaqbRqXoHKC9p7+CCuERCza7NShww95RmBAiuMiB2XEAyjlUa4KRD7Jeokr81HCrl7waNfFEICzUs8LNm0oOVKa8r5y+b1wQ41Jh5YB+ma7kiPMRZXS2WDW25QFLXQBX6YMUGhAAGE53VdvkWpJ6tzPvNE6fbyc+DyKxFG+Qi6wDFe2PaGp/6T5NhoNwvNrAlWuEW0L6rqUAF85rVOzlP0J0VQEYH7hKqIgwKvp0ejLFcNXBEVIq5/L4cisDBQD4uCnj8AqZnRMBoVraaKN4s58o2X/kZVQrKtbE5UgAd4cXBHqP5bHRX9hW21Ct0NHgLfT4NX4Zj1qW5bBr3Idm0GqIleHvgMa3ZLCUUrqvZ4LNBNt8EIn139nqTbY=
-  - secure: L1dLzPpN9dfnjuNPP3d33ry7CBmsDPcD3m87Os09Lc4niqTIvs8RppitgyctDiiTNuncooIVP/e+cB7LIZjosqOKA+Nm489NCsb0zH2i5JUhHcvKV9Qy+I6AZG5UaP7VEClScOXR5bulyGwZ0htUb84BAb18+Z2zjgi66P89anpsjSQE416wecrLP7Amit2OaYUqgo72lOkLanYQW4CdJAs8GC2ARnQcnimdre6Nrd4A79GmXmDaNUpYQah2r13pYoGUpOT+SmN8XpOgBdU/gpPaYkYPouQtpdJxOQXKrY8WmEWLlK+4EJukF8QtuL3NuhKvoAQNBaWzj4l6A3cVEAsTeEddyli09CaqVmantypzfOY52TItOzMvEofe/Cgxpz6QUmrISaC+Zlxz1f2ZRcENQlBCEJz65aK2pKaxeoCyab3tp1113e3N1peDHRxEeJE2uQSHQyJuc87sqfMMUzKpI7sruynn9EbEW9iNurGtCyio0k0jVw973sbgAjq4Pgavgz6c6tCfAXxmXoL5jYGgeBM9tiGs0bB14Nig4lY0fIN7O96EkGZEgwi5XiHSb78iTjgMBDxKFkPSQfOCH5CeukTiMqiZHYtXkyWL/Jkl9q0H5B6GgfoBGQHoCsQoAbAoWr8zG+lY0NfpVi6iFEYAFSIKg7S6/6lp3MgMLtw=
 cache:
   directories:
   - "$GOPATH/pkg/mod"
   - "$HOME/.cache/go-build"
 install:
-- pip install --user awscli
 - if [[ -a .git/shallow ]]; then git fetch --unshallow --tags; fi
-- eval $(aws ecr get-login --region eu-west-1 --no-include-email)
 script:
 - make docker-package

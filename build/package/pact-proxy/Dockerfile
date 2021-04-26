@@ -1,4 +1,4 @@
-FROM 288840537196.dkr.ecr.eu-west-1.amazonaws.com/golang:1.15-alpine AS build-env
+FROM golang:1.15-alpine AS build-env
 
 ARG APPNAME
 ENV SRCPATH $GOPATH/src/github.com/form3tech/$APPNAME
