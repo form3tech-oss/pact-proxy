@@ -1,12 +1,18 @@
 language: go
 go:
-  - 1.12.x
+- 1.12.x
 env:
   global:
-    - GO111MODULE=on
+  - GO111MODULE=on
+  - secure: dQ7t1sKwdUA0/AzXwCj8ndYTTrhUkryF95viCzmz4DP7KS8/HhpmBftOBpkSQ04xaSaWLYC0hcQ6U6NPTn+JfYqCpdwK8D4WRu92t1Knn0RR1VPQzmRS5qhJsV15bo/wn3fkvCuoA0P0F0prEmHXcDYV5IUDFFk9Jk8vH26PKa5miI3r3UsIXBUmqBu3nk23ZQf5RopmoJTmUPV7AdpN6CcumnJk+uOPfD3X82fdBlX1qivKGGSFWf6jU+wrYDs/LOIOv9hF+zA6ovaroqc8voLPCeVIzRQdP/R92J06tuTmcRYERCAF6DdLl01W1UhkTo0BEIuNDimX7ROi7ptqF2Us2OySIv4FNU+F2JJzMtvObfN8VhvJYEBDjPBfYkf/HE4kcATpWCEQfKTYDUPuJcBt37c7rgw4pbwCDCcYkLY2Bc+4apOE1m8jXekbHMhQeR14Tmq6ESYmtlUi/ObRMjQeW1V+mEZr5zSVMO00n9XBv7Jp6G7Eol7cfHBskoKvePo8F7mfuqB6blJAQc8yykE8UeqpQzLvytnU9lII/QnjIGnOb91tMn8tDKMJ/XX8VEfzksQ2vtBSEVwoup0DmjuDQjkOOxf5E2xk5gVhPCHfppJ6n4YE7MiVEBFtnJe1+78Kdp0pFiv+UZNS3j8k1QC8pS2g2JkdQAMAL4FJuNk=
+  - secure: t6ZjeUHvpVSo55ISH17LQfeDyctmgt5ah4LyR+Uf7rZRSpCUuxbG7kW9KoxlqpmonXktGpwxpZYbRlwsAFkLpdtKLN7GqI/Q/M9mv+VuNo9oEUYbprcDHhCbl+KYCzoSuWCKTy+ZLFd4bTAataz6Dmc0C0oF8SlX4+rQb4fMvP/KzDsCXIDRWikUImzPxQH0H+2jK8GlynazkWrt9ddGJI347RY1yhzjZ1Oj3WuY5AjeYSlPjs5mBm6nm+bifPClCZ9Y+pO1SIeCBkcRKXeHyyAFqrTSrou8kIkWMIVZ91lP61uLiKb3mAyaOvS+ZYzbqBtKAubtvoh7jAV2QBxHAdRcXvvEpXdESYpzSdMl5yjy5gfANoVqQd112lh/6EZZ9osg8kWVNFRs0QwRoJD39RzMigVHdfvYeVOCQ+hpi0AiGCowWlS/H4EDLtU38dN5iMRD+m1TdPVIUAoadoDcfs4B5UsyRfZTmFpHI+EYNJ6ziWCr3CzjxppK90aUNvd5Vl/hSEs0BVOlSRPugZeQx4kz1Dk9WjwXybiungUK5GZhZmSm5COl2QRnMEhl1Pn4XqSvhbPjC7VF5FltHomfl8nBXK2SMoqv2JI1T+xBCMB0J4MmK3hNN9i5pc7NtI1ZK2s3l5q+YWRROksq7NFIIBqjbOO5gjvg3D9MutUQAvs=
 cache:
   directories:
-    - $GOPATH/pkg/mod
-    - $HOME/.cache/go-build
+  - "$GOPATH/pkg/mod"
+  - "$HOME/.cache/go-build"
+install:
+- pip install --user awscli
+- if [[ -a .git/shallow ]]; then git fetch --unshallow --tags; fi
+- eval $(aws ecr get-login --region eu-west-1 --no-include-email)
 script:
-  - make docker-package
+- make docker-package
