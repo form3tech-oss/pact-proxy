@@ -1,4 +1,4 @@
-module github.com/form3tech/pact-proxy
+module github.com/form3tech-oss/pact-proxy
 
 go 1.16
 

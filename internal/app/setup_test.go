@@ -11,7 +11,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/form3tech/pact-proxy/internal/app/configuration"
+	"github.com/form3tech-oss/pact-proxy/internal/app/configuration"
 	"github.com/pact-foundation/pact-go/utils"
 )
 

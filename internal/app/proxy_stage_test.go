@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/form3tech/pact-proxy/pkg/pactproxy"
+	"github.com/form3tech-oss/pact-proxy/pkg/pactproxy"
 	"github.com/pact-foundation/pact-go/dsl"
 )
 

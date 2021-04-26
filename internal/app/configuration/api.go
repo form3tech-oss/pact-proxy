@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/form3tech/pact-proxy/internal/app/httpresponse"
+	"github.com/form3tech-oss/pact-proxy/internal/app/httpresponse"
 
 	"io/ioutil"
 	"net/http"

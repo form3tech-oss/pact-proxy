@@ -3,7 +3,7 @@ package main
 import (
 	"strconv"
 
-	"github.com/form3tech/pact-proxy/internal/app/configuration"
+	"github.com/form3tech-oss/pact-proxy/internal/app/configuration"
 	log "github.com/sirupsen/logrus"
 
 	"os"

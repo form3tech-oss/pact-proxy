@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/form3tech/pact-proxy/internal/app/pactproxy"
+	"github.com/form3tech-oss/pact-proxy/internal/app/pactproxy"
 )
 
 type ProxyConfig struct {

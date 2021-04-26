@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/form3tech/pact-proxy/internal/app/httpresponse"
+	"github.com/form3tech-oss/pact-proxy/internal/app/httpresponse"
 	log "github.com/sirupsen/logrus"
 )
 
