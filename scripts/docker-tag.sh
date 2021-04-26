@@ -1,3 +1,4 @@
+
 #!/bin/bash
 
 if [ -z ${TRAVIS_PULL_REQUEST+x} ]; then
@@ -21,3 +22,5 @@ fi
 if [ "$TAG" = "master" ]; then
     TAG="latest"
 fi
+
+echo "Tag: $TAG"

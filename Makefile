@@ -1,70 +1,51 @@
-.DEFAULT_GOAL := default
+PLATFORM                 := $(shell uname)
+NAME                     := $(shell basename $(CURDIR))
+GOFMT_FILES              ?= $$(find ./ -name '*.go' | grep -v vendor | grep -v externalmodels)
+GOTEST_DIRECTORIES       ?= $$(find ./internal/ -type f -iname "*_test.go" -exec dirname {} \; | uniq)
+PACT_VERSION             ?= "1.88.45"
 
-platform := $(shell uname)
-pact_version := "1.88.45"
-go_test_analyser_version := "0.8.0"
+export GO111MODULE=on
+export GOPRIVATE=github.com/form3tech-oss
+export GOFLAGS=-mod=vendor
 
 ifeq (${platform},Darwin)
-pact_filename := "pact-${pact_version}-osx.tar.gz"
+PACT_FILE := "pact-${PACT_VERSION}-osx.tar.gz"
 else
-pact_filename := "pact-${pact_version}-linux-x86_64.tar.gz"
+PACT_FILE := "pact-${PACT_VERSION}-linux-x86_64.tar.gz"
 endif
 
-GOFMT_FILES?=$$(find ./ -name '*.go')
-
-default: build test
-
+.PHONY: build
 build:
-	@find ./cmd/* -maxdepth 1 -type d -exec go install -mod=vendor "{}" \;
+	@echo "==> Building..."
+	@go install ./...
 
-install-goimports:
-	@if [ ! -f ./goimports ]; then \
-		go get golang.org/x/tools/cmd/goimports; \
-	fi
+.PHONY: test
+test: install-pact
+	@echo "==> Executing tests..."
+	@echo ${GOTEST_DIRECTORIES} | xargs -n1 go test --timeout 30m -v -count 1
 
-vet:
-	@echo "go vet ."
-	@go vet $$(go list ./... | grep -v vendor/) ; if [ $$? -eq 1 ]; then \
-		echo ""; \
-		echo "Vet found suspicious constructs. Please check the reported constructs"; \
-		echo "and fix them if necessary before submitting the code for review."; \
-		exit 1; \
-	fi
-
-goimports:
+.PHONY: goimports
+goimports: install-goimports
 	goimports -w $(GOFMT_FILES)
 
-errcheck:
-	@sh -c "'$(CURDIR)/scripts/errcheck.sh'"
+.PHONY: install-goimports
+install-goimports:
+	@type goimports >/dev/null 2>&1 || (cd /tmp && go get golang.org/x/tools/cmd/goimports && cd -)
 
-vendor-sync:
-	@go mod vendor
-
+.PHONY: docker-package
 docker-package: build
-	@bash -c "source ./scripts/travis_release.sh && \
-		TAG=\$${TRAVIS_TAG} $(CURDIR)/scripts/docker-package.sh ./cmd/pact-proxy"
+	@echo "==> Building docker image..."
+	@for f in ./cmd/*/; do \
+		./scripts/docker-package.sh "$$f"; \
+	done
 
-docker-publish: docker-package
-	@bash -c "$(CURDIR)/scripts/docker-publish.sh ./cmd/sepadd-gateway";
-	@bash -c "$(CURDIR)/scripts/docker-publish.sh ./cmd/fake-step2-dd";
+.PHONY: vendor
+vendor:
+	@go mod tidy && go mod vendor && go mod verify
 
-publish: docker-publish
-
-install-pact-go:
+.PHONY: install-pact
+install-pact:
 	@if [ ! -d ./pact ]; then \
-		echo "pact not installed, installing..."; \
-		wget https://github.com/pact-foundation/pact-ruby-standalone/releases/download/v${pact_version}/${pact_filename} -O /tmp/pactserver.tar.gz && tar -xzf /tmp/pactserver.tar.gz 2>/dev/null -C .; \
-	fi
-
-lint:
-	@echo "go lint ."
-	@golint $$(go list ./... | grep -v vendor/) ; if [ $$? -eq 1 ]; then \
-		echo ""; \
-		echo "Lint found errors in the source code. Please check the reported errors"; \
-		echo "and fix them if necessary before submitting the code for review."; \
-		exit 1; \
-	fi
-
-checks: vet lint errcheck
-
-
+        echo "pact not installed, installing..."; \
+        wget --quiet https://github.com/pact-foundation/pact-ruby-standalone/releases/download/v${PACT_VERSION}/${PACT_FILE} -O /tmp/pactserver.tar.gz && tar -xzf /tmp/pactserver.tar.gz 2>/dev/null -C .; \
+    fi
