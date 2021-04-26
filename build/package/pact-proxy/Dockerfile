@@ -1,6 +1,7 @@
-FROM golang:1.15-alpine AS build-env
+FROM golang:1.16.3-alpine AS build-env
 
 ARG APPNAME
+ENV GO111MODULE=auto
 ENV SRCPATH $GOPATH/src/github.com/form3tech/$APPNAME
 
 COPY ./ $SRCPATH
