@@ -1,0 +1,126 @@
+I, [2021-04-26T10:22:41.663364 #995094]  INFO -- : Registered expected interaction POST /users
+D, [2021-04-26T10:22:41.663559 #995094] DEBUG -- : {
+  "description": "A request to create a user",
+  "request": {
+    "method": "POST",
+    "path": "/users",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "name": {
+        "json_class": "Pact::Term",
+        "data": {
+          "generate": "any",
+          "matcher": {
+            "json_class": "Regexp",
+            "o": 0,
+            "s": ".*"
+          }
+        }
+      }
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "name": "any"
+    }
+  },
+  "metadata": null
+}
+I, [2021-04-26T10:22:41.665614 #995094]  INFO -- : Registered expected interaction POST /addresses
+D, [2021-04-26T10:22:41.665707 #995094] DEBUG -- : {
+  "description": "A request to create an address",
+  "request": {
+    "method": "POST",
+    "path": "/addresses",
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "address": {
+        "json_class": "Pact::Term",
+        "data": {
+          "generate": "any",
+          "matcher": {
+            "json_class": "Regexp",
+            "o": 0,
+            "s": ".*"
+          }
+        }
+      }
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "address": "any"
+    }
+  },
+  "metadata": null
+}
+I, [2021-04-26T10:22:41.668184 #995094]  INFO -- : Received request POST /addresses
+D, [2021-04-26T10:22:41.668305 #995094] DEBUG -- : {
+  "path": "/addresses",
+  "query": "",
+  "method": "post",
+  "body": {
+    "address": "test"
+  },
+  "headers": {
+    "Content-Length": "18",
+    "Content-Type": "application/json",
+    "Host": "localhost:37483",
+    "User-Agent": "Go-http-client/1.1",
+    "Accept-Encoding": "gzip",
+    "X-Forwarded-For": "127.0.0.1",
+    "Version": "HTTP/1.1"
+  }
+}
+I, [2021-04-26T10:22:41.668560 #995094]  INFO -- : Found matching response for POST /addresses
+D, [2021-04-26T10:22:41.668627 #995094] DEBUG -- : {
+  "status": 200,
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {
+    "address": "any"
+  }
+}
+I, [2021-04-26T10:22:41.670475 #995094]  INFO -- : Received request POST /users
+D, [2021-04-26T10:22:41.670584 #995094] DEBUG -- : {
+  "path": "/users",
+  "query": "",
+  "method": "post",
+  "body": {
+    "name": "test"
+  },
+  "headers": {
+    "Content-Length": "15",
+    "Content-Type": "application/json",
+    "Host": "localhost:37483",
+    "User-Agent": "Go-http-client/1.1",
+    "Accept-Encoding": "gzip",
+    "X-Forwarded-For": "127.0.0.1",
+    "Version": "HTTP/1.1"
+  }
+}
+I, [2021-04-26T10:22:41.670762 #995094]  INFO -- : Found matching response for POST /users
+D, [2021-04-26T10:22:41.670839 #995094] DEBUG -- : {
+  "status": 200,
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "body": {
+    "name": "any"
+  }
+}
+I, [2021-04-26T10:22:42.236291 #995094]  INFO -- : Verifying - interactions matched
+I, [2021-04-26T10:22:42.239756 #995094]  INFO -- : Cleared interactions

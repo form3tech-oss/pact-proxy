@@ -1,0 +1,30 @@
+# github.com/PaesslerAG/gval v1.0.0
+github.com/PaesslerAG/gval
+# github.com/PaesslerAG/jsonpath v0.1.1
+## explicit
+github.com/PaesslerAG/jsonpath
+# github.com/avast/retry-go v3.0.0+incompatible
+## explicit
+github.com/avast/retry-go
+# github.com/hashicorp/go-version v1.0.0
+github.com/hashicorp/go-version
+# github.com/hashicorp/logutils v0.0.0-20150609070431-0dc08b1671f3
+github.com/hashicorp/logutils
+# github.com/pact-foundation/pact-go v1.5.2
+## explicit
+github.com/pact-foundation/pact-go/client
+github.com/pact-foundation/pact-go/dsl
+github.com/pact-foundation/pact-go/install
+github.com/pact-foundation/pact-go/proxy
+github.com/pact-foundation/pact-go/types
+github.com/pact-foundation/pact-go/utils
+# github.com/pkg/errors v0.9.1
+## explicit
+github.com/pkg/errors
+# github.com/sirupsen/logrus v1.8.1
+## explicit
+github.com/sirupsen/logrus
+# golang.org/x/sys v0.0.0-20200625212154-ddb9806d33ae
+golang.org/x/sys/internal/unsafeheader
+golang.org/x/sys/unix
+golang.org/x/sys/windows
