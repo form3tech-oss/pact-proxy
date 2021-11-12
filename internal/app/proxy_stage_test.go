@@ -20,6 +20,7 @@ type ProxyStage struct {
 	pactResult      error
 	requestsToSend  int32
 	requestsSent    int32
+	response        *http.Response
 }
 
 const (
@@ -119,10 +120,30 @@ func (s *ProxyStage) a_request_is_sent_using_the_name(name string) {
 
 		req.Header.Set("Content-Type", "application/json")
 
-		if _, err = http.DefaultClient.Do(req); err != nil {
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return err
+		}
+		s.response = res
+		return nil
+	})
+}
+
+func (s *ProxyStage) a_request_is_sent_without_constraints_using_the_name(name string) {
+	s.pactResult = s.pact.Verify(func() (err error) {
+		u := fmt.Sprintf("http://localhost:%s/users", proxyURL.Port())
+		req, err := http.NewRequest("POST", u, strings.NewReader(fmt.Sprintf(`{"name":"%s"}`, name)))
+		if err != nil {
 			return err
 		}
 
+		req.Header.Set("Content-Type", "application/json")
+
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return err
+		}
+		s.response = res
 		return nil
 	})
 }
@@ -226,5 +247,19 @@ func (s *ProxyStage) requests_for_names_and_addresse_are_sent() *ProxyStage {
 
 		return nil
 	})
+	return s
+}
+
+func (s *ProxyStage) a_modified_response_status_of_(statusCode int) *ProxyStage {
+	s.proxy.
+		ForInteraction(PostNamePact).
+		AddModifier("$.status", fmt.Sprintf("%d", statusCode))
+	return s
+}
+
+func (s *ProxyStage) the_response_is_(statusCode int) *ProxyStage {
+	if s.response.StatusCode != statusCode {
+		s.t.Fatalf("Expected status code: %d, got : %d", statusCode, s.response.StatusCode)
+	}
 	return s
 }
