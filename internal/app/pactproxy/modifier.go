@@ -13,10 +13,12 @@ type interactionModifier struct {
 	Interaction string `json:"interaction"`
 	Path        string `json:"path"`
 	Value       string `json:"value"`
+	Attempt     *int   `json:"attempt"`
+	count       int
 }
 
-func LoadModifier(data []byte) (interactionModifier, error) {
-	modifier := interactionModifier{}
+func loadModifier(data []byte) (*interactionModifier, error) {
+	modifier := &interactionModifier{}
 	err := json.Unmarshal(data, &modifier)
 	if err != nil {
 		return modifier, errors.Wrap(err, "unable to parse interactionModifier from data")
@@ -24,16 +26,19 @@ func LoadModifier(data []byte) (interactionModifier, error) {
 	return modifier, nil
 }
 
-func (i interactionModifier) Key() string {
+func (i *interactionModifier) Key() string {
 	return strings.Join([]string{i.Interaction, i.Path}, "_")
 }
 
-func (i interactionModifier) modifyStatusCode(res http.ResponseWriter) bool {
+func (i *interactionModifier) modifyStatusCode(res http.ResponseWriter) bool {
 	if i.Path == "$.status" {
-		code, err := strconv.Atoi(i.Value)
-		if err == nil {
-			res.WriteHeader(code)
-			return true
+		i.count++
+		if i.Attempt == nil || *i.Attempt == i.count {
+			code, err := strconv.Atoi(i.Value)
+			if err == nil {
+				res.WriteHeader(code)
+				return true
+			}
 		}
 	}
 	return false

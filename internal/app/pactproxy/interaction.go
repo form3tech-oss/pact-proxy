@@ -128,7 +128,7 @@ func (i *interaction) AddConstraint(constraint interactionConstraint) {
 	i.constraints.Store(constraint.Key(), constraint)
 }
 
-func (i *interaction) AddModifier(modifier interactionModifier) {
+func (i *interaction) AddModifier(modifier *interactionModifier) {
 	i.modifiers.Store(modifier.Key(), modifier)
 }
 

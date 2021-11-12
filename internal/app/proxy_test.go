@@ -69,3 +69,22 @@ func TestModifiedStatusCode(t *testing.T) {
 		pact_verification_is_successful()
 
 }
+
+func TestModifiedStatusCode_ForNRequests(t *testing.T) {
+	given, when, then, teardown := NewProxyStage(t)
+	defer teardown()
+
+	given.
+		a_pact_that_allows_any_names().and().
+		a_modified_response_status_of_(http.StatusInternalServerError).and().
+		a_modified_response_attempt_of(2)
+
+	when.n_requests_are_sent_with_modifiers_using_the_name(3, "sam")
+
+	then.
+		n_responses_were_received(3).and().
+		the_nth_response_is_(1, http.StatusOK).and().
+		the_nth_response_is_(2, http.StatusInternalServerError).and().
+		the_nth_response_is_(3, http.StatusOK).and().
+		pact_verification_is_successful()
+}

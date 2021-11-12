@@ -54,7 +54,7 @@ func StartProxy(server *http.ServeMux, target *url.URL) {
 			return
 		}
 
-		modifier, err := LoadModifier(modifierBytes)
+		modifier, err := loadModifier(modifierBytes)
 		if err != nil {
 			httpresponse.Errorf(res, http.StatusBadRequest, "unable to load modifier. %s", err.Error())
 			return
@@ -200,14 +200,14 @@ func StartProxy(server *http.ServeMux, target *url.URL) {
 		}
 
 		unmatched := make(map[string][]string)
-		modifiers := make([]interactionModifier, 0)
+		modifiers := make([]*interactionModifier, 0)
 		for _, interaction := range allInteractions {
 			ok, info := interaction.EvaluateConstrains(request, interactions)
 			if ok {
 				log.Infof("interaction '%s' matched to '%s %s'", interaction.Description, req.Method, req.URL.Path)
 				interaction.StoreRequest(request)
 				interaction.modifiers.Range(func(key, value interface{}) bool {
-					modifier, ok := value.(interactionModifier)
+					modifier, ok := value.(*interactionModifier)
 					if ok {
 						modifiers = append(modifiers, modifier)
 					}

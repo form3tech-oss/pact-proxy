@@ -20,8 +20,9 @@ type ProxyStage struct {
 	pactResult         error
 	requestsToSend     int32
 	requestsSent       int32
-	response           *http.Response
+	responses          []*http.Response
 	modifiedStatusCode int
+	modifiedAttempt    *int
 }
 
 const (
@@ -125,30 +126,38 @@ func (s *ProxyStage) a_request_is_sent_using_the_name(name string) {
 		if err != nil {
 			return err
 		}
-		s.response = res
+		s.responses = append(s.responses, res)
 		return nil
 	})
 }
 
 func (s *ProxyStage) a_request_is_sent_with_modifiers_using_the_name(name string) {
+	s.n_requests_are_sent_with_modifiers_using_the_name(1, name)
+}
+
+func (s *ProxyStage) n_requests_are_sent_with_modifiers_using_the_name(n int, name string) {
 	s.pactResult = s.pact.Verify(func() (err error) {
 		s.proxy.
 			ForInteraction(PostNamePact).
-			AddModifier("$.status", fmt.Sprintf("%d", s.modifiedStatusCode))
+			AddModifier("$.status", fmt.Sprintf("%d", s.modifiedStatusCode), s.modifiedAttempt)
 
 		u := fmt.Sprintf("http://localhost:%s/users", proxyURL.Port())
-		req, err := http.NewRequest("POST", u, strings.NewReader(fmt.Sprintf(`{"name":"%s"}`, name)))
-		if err != nil {
-			return err
+
+		for i := 0; i < n; i++ {
+			req, err := http.NewRequest("POST", u, strings.NewReader(fmt.Sprintf(`{"name":"%s"}`, name)))
+			if err != nil {
+				return err
+			}
+
+			req.Header.Set("Content-Type", "application/json")
+			res, err := http.DefaultClient.Do(req)
+			if err != nil {
+				s.t.Error(err)
+				return err
+			}
+			s.responses = append(s.responses, res)
 		}
 
-		req.Header.Set("Content-Type", "application/json")
-
-		res, err := http.DefaultClient.Do(req)
-		if err != nil {
-			return err
-		}
-		s.response = res
 		return nil
 	})
 }
@@ -261,8 +270,28 @@ func (s *ProxyStage) a_modified_response_status_of_(statusCode int) *ProxyStage 
 }
 
 func (s *ProxyStage) the_response_is_(statusCode int) *ProxyStage {
-	if s.response.StatusCode != statusCode {
-		s.t.Fatalf("Expected status code: %d, got : %d", statusCode, s.response.StatusCode)
+	s.the_nth_response_is_(1, statusCode)
+
+	return s
+}
+
+func (s *ProxyStage) a_modified_response_attempt_of(i int) {
+	s.modifiedAttempt = &i
+}
+
+func (s *ProxyStage) the_nth_response_is_(n int, statusCode int) *ProxyStage {
+	if s.responses[n-1].StatusCode != statusCode {
+		s.t.Fatalf("Expected status code on attemt %d: %d, got : %d", n, statusCode, s.responses[n-1].StatusCode)
 	}
+
+	return s
+}
+
+func (s *ProxyStage) n_responses_were_received(n int) *ProxyStage {
+	count := len(s.responses)
+	if count != n {
+		s.t.Fatalf("Expected %d responses, got %d", n, count)
+	}
+
 	return s
 }

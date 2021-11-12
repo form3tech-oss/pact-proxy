@@ -6,7 +6,7 @@ import (
 
 type wrappedResponseWriter struct {
 	originalResponseWriter http.ResponseWriter
-	modifiers              []interactionModifier
+	modifiers              []*interactionModifier
 }
 
 func (w *wrappedResponseWriter) Header() http.Header {
@@ -26,7 +26,7 @@ func (w *wrappedResponseWriter) WriteHeader(statusCode int) {
 	w.originalResponseWriter.WriteHeader(statusCode)
 }
 
-func wrapResponseWriter(res http.ResponseWriter, modifiers []interactionModifier) http.ResponseWriter {
+func wrapResponseWriter(res http.ResponseWriter, modifiers []*interactionModifier) http.ResponseWriter {
 	return &wrappedResponseWriter{
 		originalResponseWriter: res,
 		modifiers:              modifiers,
