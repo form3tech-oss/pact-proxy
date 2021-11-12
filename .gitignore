@@ -30,3 +30,7 @@ pact/
 debug.test
 
 build/
+*.swp
+tags
+*.vim
+internal/app/logs
