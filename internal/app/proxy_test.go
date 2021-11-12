@@ -55,7 +55,7 @@ func TestWaitForAllPacts(t *testing.T) {
 	then.the_proxy_waits_for_all_requests()
 }
 
-func TestMockResponse(t *testing.T)  {
+func TestModifiedStatusCode(t *testing.T) {
 	given, when, then, teardown := NewProxyStage(t)
 	defer teardown()
 
@@ -63,7 +63,7 @@ func TestMockResponse(t *testing.T)  {
 		a_pact_that_allows_any_names().and().
 		a_modified_response_status_of_(http.StatusInternalServerError)
 
-	when.a_request_is_sent_without_constraints_using_the_name("sam")
+	when.a_request_is_sent_with_modifiers_using_the_name("sam")
 
 	then.the_response_is_(http.StatusInternalServerError).and().
 		pact_verification_is_successful()

@@ -13,14 +13,15 @@ import (
 )
 
 type ProxyStage struct {
-	t               *testing.T
-	pact            *dsl.Pact
-	proxy           *pactproxy.PactProxy
-	constraintValue string
-	pactResult      error
-	requestsToSend  int32
-	requestsSent    int32
-	response        *http.Response
+	t                  *testing.T
+	pact               *dsl.Pact
+	proxy              *pactproxy.PactProxy
+	constraintValue    string
+	pactResult         error
+	requestsToSend     int32
+	requestsSent       int32
+	response           *http.Response
+	modifiedStatusCode int
 }
 
 const (
@@ -129,8 +130,12 @@ func (s *ProxyStage) a_request_is_sent_using_the_name(name string) {
 	})
 }
 
-func (s *ProxyStage) a_request_is_sent_without_constraints_using_the_name(name string) {
+func (s *ProxyStage) a_request_is_sent_with_modifiers_using_the_name(name string) {
 	s.pactResult = s.pact.Verify(func() (err error) {
+		s.proxy.
+			ForInteraction(PostNamePact).
+			AddModifier("$.status", fmt.Sprintf("%d", s.modifiedStatusCode))
+
 		u := fmt.Sprintf("http://localhost:%s/users", proxyURL.Port())
 		req, err := http.NewRequest("POST", u, strings.NewReader(fmt.Sprintf(`{"name":"%s"}`, name)))
 		if err != nil {
@@ -251,9 +256,7 @@ func (s *ProxyStage) requests_for_names_and_addresse_are_sent() *ProxyStage {
 }
 
 func (s *ProxyStage) a_modified_response_status_of_(statusCode int) *ProxyStage {
-	s.proxy.
-		ForInteraction(PostNamePact).
-		AddModifier("$.status", fmt.Sprintf("%d", statusCode))
+	s.modifiedStatusCode = statusCode
 	return s
 }
 

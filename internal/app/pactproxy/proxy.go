@@ -33,7 +33,7 @@ func StartProxy(server *http.ServeMux, target *url.URL) {
 
 		constraint, err := LoadConstraint(constraintBytes)
 		if err != nil {
-			httpresponse.Errorf(res, http.StatusBadRequest, "unable to read constraint. %s", err.Error())
+			httpresponse.Errorf(res, http.StatusBadRequest, "unable to load constraint. %s", err.Error())
 			return
 		}
 
@@ -45,6 +45,29 @@ func StartProxy(server *http.ServeMux, target *url.URL) {
 
 		log.Infof("adding constraint to interaction '%s'", interaction.Description)
 		interaction.AddConstraint(constraint)
+	})
+
+	server.HandleFunc("/interactions/modifiers", func(res http.ResponseWriter, req *http.Request) {
+		modifierBytes, err := ioutil.ReadAll(req.Body)
+		if err != nil {
+			httpresponse.Errorf(res, http.StatusBadRequest, "unable to read modifier. %s", err.Error())
+			return
+		}
+
+		modifier, err := LoadModifier(modifierBytes)
+		if err != nil {
+			httpresponse.Errorf(res, http.StatusBadRequest, "unable to load modifier. %s", err.Error())
+			return
+		}
+
+		interaction, ok := interactions.Load(modifier.Interaction)
+		if !ok {
+			httpresponse.Errorf(res, http.StatusBadRequest, "unable to find interaction for modifier. %s", modifier.Interaction)
+			return
+		}
+
+		log.Infof("adding modifier to interaction '%s'", interaction.Description)
+		interaction.AddModifier(modifier)
 	})
 
 	server.HandleFunc("/session", func(res http.ResponseWriter, req *http.Request) {
@@ -177,11 +200,19 @@ func StartProxy(server *http.ServeMux, target *url.URL) {
 		}
 
 		unmatched := make(map[string][]string)
+		modifiers := make([]interactionModifier, 0)
 		for _, interaction := range allInteractions {
 			ok, info := interaction.EvaluateConstrains(request, interactions)
 			if ok {
 				log.Infof("interaction '%s' matched to '%s %s'", interaction.Description, req.Method, req.URL.Path)
 				interaction.StoreRequest(request)
+				interaction.modifiers.Range(func(key, value interface{}) bool {
+					modifier, ok := value.(interactionModifier)
+					if ok {
+						modifiers = append(modifiers, modifier)
+					}
+					return true
+				})
 			} else {
 				unmatched[interaction.Description] = info
 			}
@@ -197,6 +228,7 @@ func StartProxy(server *http.ServeMux, target *url.URL) {
 		}
 
 		notify.Notify()
-		proxy.ServeHTTP(res, req)
+		responseWriter := wrapResponseWriter(res, modifiers)
+		proxy.ServeHTTP(responseWriter, req)
 	})
 }
