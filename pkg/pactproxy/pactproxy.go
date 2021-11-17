@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -13,8 +14,12 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+var (
+	ErrProxyTimeoutWaiting = errors.New("timout waiting for interactions")
+)
+
 type PactProxy struct {
-	client http.Client
+	client *http.Client
 	url    string
 }
 
@@ -25,7 +30,7 @@ type InteractionSetup struct {
 
 func New(url string) *PactProxy {
 	return &PactProxy{
-		client: http.Client{
+		client: &http.Client{
 			Timeout: 30 * time.Second,
 		},
 		url: url,
@@ -84,39 +89,53 @@ func (p *PactProxy) addConstraintFrom(interaction, pactPath, fromInteraction, fo
 }
 
 func (p *PactProxy) WaitForAll() error {
-	r, _ := http.NewRequest("GET", strings.TrimSuffix(p.url, "/")+"/interactions/wait", nil)
-	res, err := p.client.Do(r)
+	url := fmt.Sprintf("%s/interactions/wait", p.url)
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return err
 	}
+
+	res, err := p.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
 	if res.StatusCode != http.StatusOK {
-		return errors.New("timout waiting for interactions")
+		return ErrProxyTimeoutWaiting
 	}
 	return nil
 }
 
 func (p *PactProxy) WaitForInteraction(interaction string, count int) error {
-
 	q := url.Values{}
 	q.Add("interaction", interaction)
 	q.Add("count", strconv.Itoa(count))
 
-	r, _ := http.NewRequest("GET", strings.TrimSuffix(p.url, "/")+"/interactions/wait?"+q.Encode(), nil)
-	res, err := p.client.Do(r)
+	url := fmt.Sprintf("%s/interactions/wait?%s", p.url, q.Encode())
+	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return err
 	}
+
+	res, err := p.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
 	if res.StatusCode != http.StatusOK {
 		return errors.New("fail")
 	}
+
 	return nil
 }
 
-func (s InteractionSetup) AddConstraint(path, value string) InteractionSetup {
+func (s *InteractionSetup) AddConstraint(path, value string) *InteractionSetup {
 	s.pactProxy.addConstraint(s.interaction, path, value)
 	return s
 }
 
-func (s InteractionSetup) AddConstraintFrom(path, fromInteraction, format string, values ...string) {
+func (s *InteractionSetup) AddConstraintFrom(path, fromInteraction, format string, values ...string) {
 	s.pactProxy.addConstraintFrom(s.interaction, path, fromInteraction, format, values)
 }
