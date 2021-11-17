@@ -3,23 +3,27 @@ package pactproxy
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/form3tech-oss/pact-proxy/internal/app/configuration"
 	"github.com/pkg/errors"
 )
 
+var (
+	ErrProxyConfigResseting = errors.New("error resetting proxies")
+)
+
 type ProxyConfiguration struct {
-	client http.Client
+	client *http.Client
 	url    string
 }
 
 func Configuration(url string) *ProxyConfiguration {
 	return &ProxyConfiguration{
-		client: http.Client{
+		client: &http.Client{
 			Timeout: 30 * time.Second,
 		},
 		url: url,
@@ -33,42 +37,52 @@ func (conf *ProxyConfiguration) SetupProxy(serverAddress, targetAddress string) 
 	}
 
 	content, err := json.Marshal(config)
+	if err != nil {
+		return nil, err
+	}
 
-	req, err := http.NewRequest("POST", strings.TrimSuffix(conf.url, "/")+"/proxies", bytes.NewReader(content))
+	url := fmt.Sprintf("%s/proxies", conf.url)
+	req, err := http.NewRequest("POST", url, bytes.NewReader(content))
 	if err != nil {
 		return nil, err
 	}
 
 	req.Header.Set("Content-Type", "application/json")
 
-	res, err := http.DefaultClient.Do(req)
+	res, err := conf.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	responseBody, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		return nil, err
 	}
 
-	responseBody, err := ioutil.ReadAll(res.Body)
-	defer res.Body.Close()
-
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return nil, errors.New(string(responseBody))
+		return nil, fmt.Errorf("bad status: %s", responseBody)
 	}
+
 	return New(serverAddress), err
 }
 
 func (conf *ProxyConfiguration) Reset() error {
-	req, err := http.NewRequest("DELETE", strings.TrimSuffix(conf.url, "/")+"/proxies", nil)
+	url := fmt.Sprintf("%s/proxies", conf.url)
+	req, err := http.NewRequest("DELETE", url, nil)
 	if err != nil {
-		return err
+		return fmt.Errorf("request: %w", err)
 	}
 
-	res, err := http.DefaultClient.Do(req)
+	res, err := conf.client.Do(req)
 	if err != nil {
-		return nil
+		return fmt.Errorf("request: %w", err)
 	}
-	res.Body.Close()
+	defer res.Body.Close()
 
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
-		return errors.New("error resetting proxies")
+		return ErrProxyConfigResseting
 	}
-	return err
+
+	return nil
 }
