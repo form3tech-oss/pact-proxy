@@ -228,35 +228,42 @@ func StartProxy(server *http.ServeMux, target *url.URL) {
 		}
 
 		notify.Notify()
-		//responseWriter := wrapResponseWriter(res, modifiers)
-		proxy.ModifyResponse = func(response *http.Response) error {
-			for _, modifier := range modifiers {
-				if ok, modifiedStatusCode := modifier.modifyStatusCode(); ok {
-					response.StatusCode = modifiedStatusCode
-				}
-				b, err := ioutil.ReadAll(response.Body)
-				if err != nil {
-					return err
-				}
+		proxy.ModifyResponse = modifyResponseFunc(modifiers)
+		defer func() {
+			// todo concurrency issues with using a global proxy
+			proxy.ModifyResponse = nil
+		}()
 
-				modifB, err := modifier.modifyBody(b)
-				if err != nil {
-					return err
-				}
-
-				response.Body = ioutil.NopCloser(bytes.NewBuffer(modifB))
-
-
-				lenB := len(b)
-				lenBody := len(modifB)
-				if lenB != lenBody {
-					response.ContentLength = int64(lenBody)
-					response.Header.Set("Content-Length", strconv.Itoa(lenBody))
-				}
-			}
-
-			return nil
-		}
 		proxy.ServeHTTP(res, req)
 	})
+}
+
+func modifyResponseFunc(modifiers []*interactionModifier) func(response *http.Response) error {
+	return func(response *http.Response) error {
+		for _, modifier := range modifiers {
+			if ok, modifiedStatusCode := modifier.modifyStatusCode(); ok {
+				response.StatusCode = modifiedStatusCode
+			}
+			b, err := ioutil.ReadAll(response.Body)
+			if err != nil {
+				return err
+			}
+
+			modifB, err := modifier.modifyBody(b)
+			if err != nil {
+				return err
+			}
+
+			response.Body = ioutil.NopCloser(bytes.NewBuffer(modifB))
+
+			lenB := len(b)
+			lenBody := len(modifB)
+			if lenB != lenBody {
+				response.ContentLength = int64(lenBody)
+				response.Header.Set("Content-Length", strconv.Itoa(lenBody))
+			}
+		}
+
+		return nil
+	}
 }
