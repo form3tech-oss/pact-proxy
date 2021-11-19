@@ -2,7 +2,8 @@ package pactproxy
 
 import (
 	"encoding/json"
-	"net/http"
+	"fmt"
+	"github.com/tidwall/sjson"
 	"strconv"
 	"strings"
 
@@ -14,7 +15,8 @@ type interactionModifier struct {
 	Path        string `json:"path"`
 	Value       string `json:"value"`
 	Attempt     *int   `json:"attempt"`
-	count       int
+	countStatusCode       int
+	countBody       int
 }
 
 func loadModifier(data []byte) (*interactionModifier, error) {
@@ -30,16 +32,29 @@ func (i *interactionModifier) Key() string {
 	return strings.Join([]string{i.Interaction, i.Path}, "_")
 }
 
-func (i *interactionModifier) modifyStatusCode(res http.ResponseWriter) bool {
+func (i *interactionModifier) modifyBody(b []byte) ([]byte, error)  {
+	if len(i.Path) < 7 {
+		return nil, fmt.Errorf("invalid path: %s", i.Path)
+	}
+	if i.Path[:7] == "$.body." {
+		i.countBody++
+		if i.Attempt == nil || *i.Attempt == i.countBody {
+			out, err := sjson.SetBytes(b, i.Path[7:], i.Value)
+			return out, err
+		}
+	}
+	return b, nil
+}
+
+func (i *interactionModifier) modifyStatusCode() (bool, int) {
 	if i.Path == "$.status" {
-		i.count++
-		if i.Attempt == nil || *i.Attempt == i.count {
+		i.countStatusCode++
+		if i.Attempt == nil || *i.Attempt == i.countStatusCode {
 			code, err := strconv.Atoi(i.Value)
 			if err == nil {
-				res.WriteHeader(code)
-				return true
+				return true, code
 			}
 		}
 	}
-	return false
+	return false, 0
 }
