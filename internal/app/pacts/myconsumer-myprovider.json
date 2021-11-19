@@ -7,6 +7,34 @@
   },
   "interactions": [
     {
+      "description": "A request to create an address",
+      "request": {
+        "method": "POST",
+        "path": "/addresses",
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "address": "any"
+        },
+        "matchingRules": {
+          "$.body.address": {
+            "match": "regex",
+            "regex": ".*"
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "address": "any"
+        }
+      }
+    },
+    {
       "description": "A request to create a user",
       "request": {
         "method": "POST",
