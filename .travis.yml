@@ -10,6 +10,16 @@ cache:
   - "$HOME/.cache/go-build"
 install:
 - if [[ -a .git/shallow ]]; then git fetch --unshallow --tags; fi
-script:
-- make test
-- make docker-package
+
+jobs:
+  include:
+  - stage: test
+      name: Go Test
+      script:
+        - make test
+
+  - stage: publish
+      name: Publish
+      if: "env(TRAVIS_TAG) IS present"
+      script:
+        - make publish
