@@ -21,10 +21,12 @@ func StartProxy(server *http.ServeMux, target *url.URL) {
 	notify := NewNotify()
 
 	server.HandleFunc("/interactions/verification", func(res http.ResponseWriter, req *http.Request) {
+		proxy.ModifyResponse = nil
 		proxy.ServeHTTP(res, req)
 	})
 
 	server.HandleFunc("/interactions/constraints", func(res http.ResponseWriter, req *http.Request) {
+		proxy.ModifyResponse = nil
 		constraintBytes, err := ioutil.ReadAll(req.Body)
 		if err != nil {
 			httpresponse.Errorf(res, http.StatusBadRequest, "unable to read constraint. %s", err.Error())
@@ -48,6 +50,7 @@ func StartProxy(server *http.ServeMux, target *url.URL) {
 	})
 
 	server.HandleFunc("/interactions/modifiers", func(res http.ResponseWriter, req *http.Request) {
+		proxy.ModifyResponse = nil
 		modifierBytes, err := ioutil.ReadAll(req.Body)
 		if err != nil {
 			httpresponse.Errorf(res, http.StatusBadRequest, "unable to read modifier. %s", err.Error())
@@ -71,6 +74,7 @@ func StartProxy(server *http.ServeMux, target *url.URL) {
 	})
 
 	server.HandleFunc("/session", func(res http.ResponseWriter, req *http.Request) {
+		proxy.ModifyResponse = nil
 		if req.Method == http.MethodDelete {
 			log.Infof("deleting session for %s", target)
 			proxy.ServeHTTP(res, req)
@@ -79,6 +83,7 @@ func StartProxy(server *http.ServeMux, target *url.URL) {
 	})
 
 	server.HandleFunc("/interactions", func(res http.ResponseWriter, req *http.Request) {
+		proxy.ModifyResponse = nil
 		if req.Method == http.MethodDelete {
 			proxy.ServeHTTP(res, req)
 			interactions.Clear()
@@ -120,6 +125,7 @@ func StartProxy(server *http.ServeMux, target *url.URL) {
 	})
 
 	server.HandleFunc("/interactions/wait", func(res http.ResponseWriter, req *http.Request) {
+		proxy.ModifyResponse = nil
 		waitFor := req.URL.Query().Get("interaction")
 		waitForCount, err := strconv.Atoi(req.URL.Query().Get("count"))
 		if err != nil {
@@ -230,7 +236,6 @@ func StartProxy(server *http.ServeMux, target *url.URL) {
 		notify.Notify()
 		proxy.ModifyResponse = modifyResponseFunc(modifiers)
 		defer func() {
-			// todo concurrency issues with using a global proxy
 			proxy.ModifyResponse = nil
 		}()
 
@@ -243,22 +248,22 @@ func modifyResponseFunc(modifiers []*interactionModifier) func(response *http.Re
 		for _, modifier := range modifiers {
 			if ok, modifiedStatusCode := modifier.modifyStatusCode(); ok {
 				response.StatusCode = modifiedStatusCode
+				continue
 			}
 			b, err := ioutil.ReadAll(response.Body)
 			if err != nil {
 				return err
 			}
 
-			modifB, err := modifier.modifyBody(b)
+			modifiedBody, err := modifier.modifyBody(b)
 			if err != nil {
 				return err
 			}
 
-			response.Body = ioutil.NopCloser(bytes.NewBuffer(modifB))
+			response.Body = ioutil.NopCloser(bytes.NewBuffer(modifiedBody))
 
-			lenB := len(b)
-			lenBody := len(modifB)
-			if lenB != lenBody {
+			lenBody := len(modifiedBody)
+			if len(b) != lenBody {
 				response.ContentLength = int64(lenBody)
 				response.Header.Set("Content-Length", strconv.Itoa(lenBody))
 			}

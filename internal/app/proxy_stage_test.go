@@ -23,10 +23,9 @@ type ProxyStage struct {
 	requestsToSend     int32
 	requestsSent       int32
 	responses          []*http.Response
+	responseBodies     [][]byte
 	modifiedStatusCode int
 	modifiedAttempt    *int
-	modifiedBodyValue  string
-	modifiedBodyPath   string
 	modifiedBody       map[string]string
 }
 
@@ -59,9 +58,9 @@ func NewProxyStage(t *testing.T) (*ProxyStage, *ProxyStage, *ProxyStage, func())
 	}
 
 	stage := &ProxyStage{
-		t:     t,
-		proxy: proxy,
-		pact:  pact,
+		t:            t,
+		proxy:        proxy,
+		pact:         pact,
 		modifiedBody: make(map[string]string),
 	}
 
@@ -99,7 +98,7 @@ func (s *ProxyStage) a_pact_that_returns_no_body() *ProxyStage {
 		UponReceiving(PostNamePact).
 		WithRequest(dsl.Request{
 			Method:  "POST",
-			Path:    dsl.String("/users/1"),
+			Path:    dsl.String("/users"),
 			Headers: dsl.MapMatcher{"Content-Type": dsl.String("application/json")},
 			Body:    dsl.MapMatcher{"name": dsl.Regex("any", ".*")},
 		}).
@@ -118,9 +117,9 @@ func (s *ProxyStage) a_pact_that_allows_any_first_and_last_names() *ProxyStage {
 			Method:  "POST",
 			Path:    dsl.String("/users"),
 			Headers: dsl.MapMatcher{"Content-Type": dsl.String("application/json")},
-			Body:    dsl.MapMatcher{
+			Body: dsl.MapMatcher{
 				"first_name": dsl.Regex("any", ".*"),
-				"last_name": dsl.Regex("any", ".*"),
+				"last_name":  dsl.Regex("any", ".*"),
 			},
 		}).
 		WillRespondWith(dsl.Response{
@@ -171,6 +170,11 @@ func (s *ProxyStage) a_request_is_sent_using_the_name(name string) {
 			return err
 		}
 		s.responses = append(s.responses, res)
+		bodyBytes, err := io.ReadAll(res.Body)
+		if err != nil {
+			s.t.Fatalf("unable to read response body, %v", err)
+		}
+		s.responseBodies = append(s.responseBodies, bodyBytes)
 		return nil
 	})
 }
@@ -211,6 +215,11 @@ func (s *ProxyStage) n_requests_are_sent_with_modifiers_using_the_body(n int, bo
 				return err
 			}
 			s.responses = append(s.responses, res)
+			bodyBytes, err := io.ReadAll(res.Body)
+			if err != nil {
+				s.t.Fatalf("unable to read response body, %v", err)
+			}
+			s.responseBodies = append(s.responseBodies, bodyBytes)
 		}
 
 		return nil
@@ -355,12 +364,8 @@ func (s *ProxyStage) the_nth_response_is_(n, statusCode int) *ProxyStage {
 
 func (s *ProxyStage) the_nth_response_name_is_(n int, name string) *ProxyStage {
 	var body map[string]string
-	bodyBytes, err := io.ReadAll(s.responses[n-1].Body)
-	if err != nil {
-		s.t.Fatalf("unable to read response body, %v", err)
-	}
 
-	err = json.Unmarshal(bodyBytes, &body)
+	err := json.Unmarshal(s.responseBodies[n-1], &body)
 	if err != nil {
 		s.t.Fatalf("unable to parse response body, %v", err)
 	}
@@ -374,12 +379,8 @@ func (s *ProxyStage) the_nth_response_name_is_(n int, name string) *ProxyStage {
 
 func (s *ProxyStage) the_nth_response_body_has_(n int, key, value string) *ProxyStage {
 	var responseBody map[string]string
-	bodyBytes, err := io.ReadAll(s.responses[n-1].Body)
-	if err != nil {
-		s.t.Fatalf("unable to read response body, %v", err)
-	}
 
-	err = json.Unmarshal(bodyBytes, &responseBody)
+	err := json.Unmarshal(s.responseBodies[n-1], &responseBody)
 	if err != nil {
 		s.t.Fatalf("unable to parse response body, %v", err)
 	}

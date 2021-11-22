@@ -155,7 +155,7 @@ func TestModifiedBodyWithFirstAndLastName_ForNRequests(t *testing.T) {
 		the_nth_response_body_has_(1, "first_name", "any").and().
 		the_nth_response_body_has_(1, "last_name", "any").and().
 		the_nth_response_body_has_(2, "first_name", "jim").and().
-		the_nth_response_body_has_(2, "last_name", "gude").and().
+		the_nth_response_body_has_(2, "last_name", "gud").and().
 		the_nth_response_body_has_(3, "first_name", "any").and().
 		the_nth_response_body_has_(3, "last_name", "any").and().
 		pact_verification_is_successful()

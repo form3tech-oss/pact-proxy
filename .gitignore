@@ -22,6 +22,7 @@ pact-go
 ./pact-go
 pact/
 .serverport
+internal/app/pacts/myconsumer-myprovider.json
 
 
 
