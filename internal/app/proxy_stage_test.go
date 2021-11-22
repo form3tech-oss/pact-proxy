@@ -355,6 +355,10 @@ func (s *ProxyStage) a_modified_response_attempt_of(i int) {
 }
 
 func (s *ProxyStage) the_nth_response_is_(n, statusCode int) *ProxyStage {
+	if len(s.responses) < n {
+		s.t.Fatalf("Expected at least %d responses, got %d", n, len(s.responses))
+	}
+
 	if s.responses[n-1].StatusCode != statusCode {
 		s.t.Fatalf("Expected status code on attemt %d: %d, got : %d", n, statusCode, s.responses[n-1].StatusCode)
 	}
@@ -363,10 +367,12 @@ func (s *ProxyStage) the_nth_response_is_(n, statusCode int) *ProxyStage {
 }
 
 func (s *ProxyStage) the_nth_response_name_is_(n int, name string) *ProxyStage {
-	var body map[string]string
+	if len(s.responses) < n {
+		s.t.Fatalf("Expected at least %d responses, got %d", n, len(s.responses))
+	}
 
-	err := json.Unmarshal(s.responseBodies[n-1], &body)
-	if err != nil {
+	var body map[string]string
+	if err := json.Unmarshal(s.responseBodies[n-1], &body); err != nil {
 		s.t.Fatalf("unable to parse response body, %v", err)
 	}
 
@@ -378,10 +384,12 @@ func (s *ProxyStage) the_nth_response_name_is_(n int, name string) *ProxyStage {
 }
 
 func (s *ProxyStage) the_nth_response_body_has_(n int, key, value string) *ProxyStage {
-	var responseBody map[string]string
+	if len(s.responseBodies) < n {
+		s.t.Fatalf("Expected at least %d responses, got %d", n, len(s.responseBodies))
+	}
 
-	err := json.Unmarshal(s.responseBodies[n-1], &responseBody)
-	if err != nil {
+	var responseBody map[string]string
+	if err := json.Unmarshal(s.responseBodies[n-1], &responseBody); err != nil {
 		s.t.Fatalf("unable to parse response body, %v", err)
 	}
 
