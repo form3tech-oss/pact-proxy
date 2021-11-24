@@ -45,7 +45,6 @@ func NewProxyStage(t *testing.T) (*ProxyStage, *ProxyStage, *ProxyStage, func())
 	proxy, err := pactproxy.
 		Configuration(adminURL.String()).
 		SetupProxy(proxyURL.String(), fmt.Sprintf("http://%s:%d", pact.Host, pact.Server.Port))
-
 	if err != nil {
 		t.Logf("Error setting up proxy: %v", err)
 		t.Fail()
@@ -298,7 +297,6 @@ func (s *ProxyStage) requests_for_names_and_addresse_are_sent() *ProxyStage {
 				s.t.Error(err)
 				s.t.Fail()
 			}
-
 		}()
 
 		go func() {
@@ -315,7 +313,6 @@ func (s *ProxyStage) requests_for_names_and_addresse_are_sent() *ProxyStage {
 				s.t.Error(err)
 				s.t.Fail()
 			}
-
 		}()
 
 		if err := s.proxy.WaitForAll(); err != nil {

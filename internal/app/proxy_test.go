@@ -67,7 +67,6 @@ func TestModifiedStatusCode(t *testing.T) {
 
 	then.the_response_is_(http.StatusInternalServerError).and().
 		pact_verification_is_successful()
-
 }
 
 func TestModifiedStatusCodeOnARequestWithoutBody(t *testing.T) {
@@ -82,7 +81,6 @@ func TestModifiedStatusCodeOnARequestWithoutBody(t *testing.T) {
 
 	then.the_response_is_(http.StatusInternalServerError).and().
 		pact_verification_is_successful()
-
 }
 
 func TestModifiedBody(t *testing.T) {
@@ -97,7 +95,6 @@ func TestModifiedBody(t *testing.T) {
 
 	then.the_response_name_is_("jane").and().
 		pact_verification_is_successful()
-
 }
 
 func TestModifiedStatusCode_ForNRequests(t *testing.T) {

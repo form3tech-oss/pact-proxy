@@ -3,12 +3,10 @@ package configuration
 import (
 	"encoding/json"
 	"fmt"
-
-	"github.com/form3tech-oss/pact-proxy/internal/app/httpresponse"
-
 	"io/ioutil"
 	"net/http"
 
+	"github.com/form3tech-oss/pact-proxy/internal/app/httpresponse"
 	log "github.com/sirupsen/logrus"
 )
 

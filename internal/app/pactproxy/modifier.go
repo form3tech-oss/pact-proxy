@@ -3,19 +3,19 @@ package pactproxy
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/tidwall/sjson"
 	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/tidwall/sjson"
 )
 
 type interactionModifier struct {
-	Interaction string `json:"interaction"`
-	Path        string `json:"path"`
-	Value       string `json:"value"`
-	Attempt     *int   `json:"attempt"`
-	countStatusCode       int
+	Interaction     string `json:"interaction"`
+	Path            string `json:"path"`
+	Value           string `json:"value"`
+	Attempt         *int   `json:"attempt"`
+	countStatusCode int
 	countBody       int
 }
 
@@ -32,7 +32,7 @@ func (i *interactionModifier) Key() string {
 	return strings.Join([]string{i.Interaction, i.Path}, "_")
 }
 
-func (i *interactionModifier) modifyBody(b []byte) ([]byte, error)  {
+func (i *interactionModifier) modifyBody(b []byte) ([]byte, error) {
 	if len(i.Path) < 7 {
 		return nil, fmt.Errorf("invalid path: %s", i.Path)
 	}

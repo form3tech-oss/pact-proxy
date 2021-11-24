@@ -25,9 +25,7 @@ func getTopLevelDir() (string, error) {
 	gitCommand := exec.Command("git", "rev-parse", "--show-toplevel")
 	var out bytes.Buffer
 	gitCommand.Stdout = &out
-	err := gitCommand.Run()
-
-	if err != nil {
+	if err := gitCommand.Run(); err != nil {
 		return "", err
 	}
 

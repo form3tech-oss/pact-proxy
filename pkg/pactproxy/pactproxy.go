@@ -114,7 +114,6 @@ func (p *PactProxy) WaitForAll() error {
 }
 
 func (p *PactProxy) WaitForInteraction(interaction string, count int) error {
-
 	q := url.Values{}
 	q.Add("interaction", interaction)
 	q.Add("count", strconv.Itoa(count))
