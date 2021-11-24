@@ -1,24 +1,24 @@
 language: go
 go:
-- 1.16.x
+  - 1.16.x
 env:
   global:
-  - GO111MODULE=on
+    - GO111MODULE=on
 cache:
   directories:
-  - "$GOPATH/pkg/mod"
-  - "$HOME/.cache/go-build"
+    - "$GOPATH/pkg/mod"
+    - "$HOME/.cache/go-build"
 install:
-- if [[ -a .git/shallow ]]; then git fetch --unshallow --tags; fi
+  - if [[ -a .git/shallow ]]; then git fetch --unshallow --tags; fi
 
 jobs:
   include:
-  - stage: test
+    - stage: test
       name: Go Test
       script:
         - make test
 
-  - stage: publish
+    - stage: publish
       name: Publish
       if: "env(TRAVIS_TAG) IS present"
       script:
