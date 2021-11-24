@@ -53,3 +53,4 @@ publish:
 	echo "$(DOCKER_PASSWORD)" | docker login -u "$(DOCKER_USERNAME)" --password-stdin
 	@echo "==> Pushing built image..."
 	docker push $(DOCKER_IMG):$(TRAVIS_TAG)
+	docker push $(DOCKER_IMG):latest
