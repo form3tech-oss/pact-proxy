@@ -21,10 +21,12 @@ func StartProxy(server *http.ServeMux, target *url.URL) {
 	notify := NewNotify()
 
 	server.HandleFunc("/interactions/verification", func(res http.ResponseWriter, req *http.Request) {
+		proxy.ModifyResponse = nil
 		proxy.ServeHTTP(res, req)
 	})
 
 	server.HandleFunc("/interactions/constraints", func(res http.ResponseWriter, req *http.Request) {
+		proxy.ModifyResponse = nil
 		constraintBytes, err := ioutil.ReadAll(req.Body)
 		if err != nil {
 			httpresponse.Errorf(res, http.StatusBadRequest, "unable to read constraint. %s", err.Error())
@@ -33,7 +35,7 @@ func StartProxy(server *http.ServeMux, target *url.URL) {
 
 		constraint, err := LoadConstraint(constraintBytes)
 		if err != nil {
-			httpresponse.Errorf(res, http.StatusBadRequest, "unable to read constraint. %s", err.Error())
+			httpresponse.Errorf(res, http.StatusBadRequest, "unable to load constraint. %s", err.Error())
 			return
 		}
 
@@ -47,7 +49,32 @@ func StartProxy(server *http.ServeMux, target *url.URL) {
 		interaction.AddConstraint(constraint)
 	})
 
+	server.HandleFunc("/interactions/modifiers", func(res http.ResponseWriter, req *http.Request) {
+		proxy.ModifyResponse = nil
+		modifierBytes, err := ioutil.ReadAll(req.Body)
+		if err != nil {
+			httpresponse.Errorf(res, http.StatusBadRequest, "unable to read modifier. %s", err.Error())
+			return
+		}
+
+		modifier, err := loadModifier(modifierBytes)
+		if err != nil {
+			httpresponse.Errorf(res, http.StatusBadRequest, "unable to load modifier. %s", err.Error())
+			return
+		}
+
+		interaction, ok := interactions.Load(modifier.Interaction)
+		if !ok {
+			httpresponse.Errorf(res, http.StatusBadRequest, "unable to find interaction for modifier. %s", modifier.Interaction)
+			return
+		}
+
+		log.Infof("adding modifier to interaction '%s'", interaction.Description)
+		interaction.AddModifier(modifier)
+	})
+
 	server.HandleFunc("/session", func(res http.ResponseWriter, req *http.Request) {
+		proxy.ModifyResponse = nil
 		if req.Method == http.MethodDelete {
 			log.Infof("deleting session for %s", target)
 			proxy.ServeHTTP(res, req)
@@ -56,6 +83,7 @@ func StartProxy(server *http.ServeMux, target *url.URL) {
 	})
 
 	server.HandleFunc("/interactions", func(res http.ResponseWriter, req *http.Request) {
+		proxy.ModifyResponse = nil
 		if req.Method == http.MethodDelete {
 			proxy.ServeHTTP(res, req)
 			interactions.Clear()
@@ -97,6 +125,7 @@ func StartProxy(server *http.ServeMux, target *url.URL) {
 	})
 
 	server.HandleFunc("/interactions/wait", func(res http.ResponseWriter, req *http.Request) {
+		proxy.ModifyResponse = nil
 		waitFor := req.URL.Query().Get("interaction")
 		waitForCount, err := strconv.Atoi(req.URL.Query().Get("count"))
 		if err != nil {
@@ -177,11 +206,19 @@ func StartProxy(server *http.ServeMux, target *url.URL) {
 		}
 
 		unmatched := make(map[string][]string)
+		modifiers := make([]*interactionModifier, 0)
 		for _, interaction := range allInteractions {
 			ok, info := interaction.EvaluateConstrains(request, interactions)
 			if ok {
 				log.Infof("interaction '%s' matched to '%s %s'", interaction.Description, req.Method, req.URL.Path)
 				interaction.StoreRequest(request)
+				interaction.modifiers.Range(func(key, value interface{}) bool {
+					modifier, ok := value.(*interactionModifier)
+					if ok {
+						modifiers = append(modifiers, modifier)
+					}
+					return true
+				})
 			} else {
 				unmatched[interaction.Description] = info
 			}
@@ -197,6 +234,41 @@ func StartProxy(server *http.ServeMux, target *url.URL) {
 		}
 
 		notify.Notify()
+		proxy.ModifyResponse = modifyResponseFunc(modifiers)
+		defer func() {
+			proxy.ModifyResponse = nil
+		}()
+
 		proxy.ServeHTTP(res, req)
 	})
+}
+
+func modifyResponseFunc(modifiers []*interactionModifier) func(response *http.Response) error {
+	return func(response *http.Response) error {
+		for _, modifier := range modifiers {
+			if ok, modifiedStatusCode := modifier.modifyStatusCode(); ok {
+				response.StatusCode = modifiedStatusCode
+				continue
+			}
+			b, err := ioutil.ReadAll(response.Body)
+			if err != nil {
+				return err
+			}
+
+			modifiedBody, err := modifier.modifyBody(b)
+			if err != nil {
+				return err
+			}
+
+			response.Body = ioutil.NopCloser(bytes.NewBuffer(modifiedBody))
+
+			lenBody := len(modifiedBody)
+			if len(b) != lenBody {
+				response.ContentLength = int64(lenBody)
+				response.Header.Set("Content-Length", strconv.Itoa(lenBody))
+			}
+		}
+
+		return nil
+	}
 }

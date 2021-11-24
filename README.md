@@ -15,6 +15,9 @@ The proxy intercepts http requests that would usually be sent to the pact mock s
 register interactions and the actual interactions themselves. The proxy exposes additional endpoints that allow
 additional constrains to be added to an interaction, these are evaluated by the proxy before the request is
 forwarded onto the pact mock server.
+After the request is returned from the pact mock server, modifiers can be applied. A modifier can modify HTTP status code
+or body. This can be useful for testing server side errors or reusing same pacts without generating additional load
+on the pact provider side.
 
 ![pact proxy](./pact-proxy.png)
 
@@ -97,6 +100,38 @@ value:             $.query.username
 
 With this constraint added when a request is sent to `GET /v1/users?usernane=Jane` then a request to 
 `/v1/addresses` must have a username in the body of `Jane` as well.
+
+## Modifiers
+Pact-proxy can register response modifiers for HTTP status code or response body with optional on `attempt` indicator.
+
+An example HTTP status code modifier:
+```
+POST /interactions/modifiers
+
+interaction:       example interaction 1
+path:              $.status
+value:             503
+````
+
+An example response body modifier:
+```
+POST /interactions/modifiers
+
+interaction:       example interaction 1
+path:              $.body.username
+value:             jim.brown
+````
+
+An example response body modifier on second attempt:
+```
+POST /interactions/modifiers
+
+interaction:       example interaction 1
+path:              $.body.username
+value:             jim.brown
+attempt:           2
+````
+
 
 ## What other operations are supported?
 

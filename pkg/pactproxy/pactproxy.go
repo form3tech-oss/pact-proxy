@@ -54,6 +54,24 @@ func (p *PactProxy) addConstraint(interaction, pactPath, value string) {
 	}
 }
 
+func (p *PactProxy) addModifier(interaction, path, value string, attempt *int) {
+	body := map[string]interface{}{
+		"interaction": interaction,
+		"path":        path,
+		"value":       value,
+	}
+	if attempt != nil {
+		body["attempt"] = attempt
+	}
+	b, _ := json.Marshal(body)
+
+	r, _ := http.NewRequest("POST", strings.TrimSuffix(p.url, "/")+"/interactions/modifiers", bytes.NewBuffer(b))
+	_, err := p.client.Do(r)
+	if err != nil {
+		panic(err)
+	}
+}
+
 func (p *PactProxy) addConstraintFrom(interaction, pactPath, fromInteraction, format string, values []string) {
 	b, err := json.Marshal(map[string]interface{}{
 		"interaction": interaction,
@@ -96,7 +114,6 @@ func (p *PactProxy) WaitForAll() error {
 }
 
 func (p *PactProxy) WaitForInteraction(interaction string, count int) error {
-
 	q := url.Values{}
 	q.Add("interaction", interaction)
 	q.Add("count", strconv.Itoa(count))
@@ -114,6 +131,11 @@ func (p *PactProxy) WaitForInteraction(interaction string, count int) error {
 
 func (s InteractionSetup) AddConstraint(path, value string) InteractionSetup {
 	s.pactProxy.addConstraint(s.interaction, path, value)
+	return s
+}
+
+func (s InteractionSetup) AddModifier(path, value string, attempt *int) InteractionSetup {
+	s.pactProxy.addModifier(s.interaction, path, value, attempt)
 	return s
 }
 

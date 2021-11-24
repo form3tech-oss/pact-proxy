@@ -1,15 +1,14 @@
 package main
 
 import (
+	"os"
+	"os/signal"
 	"strconv"
+	"strings"
+	"syscall"
 
 	"github.com/form3tech-oss/pact-proxy/internal/app/configuration"
 	log "github.com/sirupsen/logrus"
-
-	"os"
-	"os/signal"
-	"strings"
-	"syscall"
 )
 
 func main() {

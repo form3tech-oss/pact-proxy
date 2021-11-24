@@ -19,12 +19,12 @@ func Error(w http.ResponseWriter, code int, error string) {
 
 	payload, err := json.Marshal(e)
 	if err != nil {
-		log.Error("could not marshal error into json, %s", err)
+		log.WithError(err).Error("could not marshal error into json")
 	}
 
 	_, err = fmt.Fprintln(w, payload)
 	if err != nil {
-		log.Error("could not write httpresponse error, %s", err)
+		log.WithError(err).Error("could not write httpresponse error")
 	}
 }
 

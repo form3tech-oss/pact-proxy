@@ -41,6 +41,7 @@ type interaction struct {
 	Description  string
 	definition   map[string]interface{}
 	constraints  sync.Map
+	modifiers    sync.Map
 	lastRequest  atomic.Value
 	requestCount int32
 }
@@ -125,6 +126,10 @@ func (i *interaction) Match(path, method string) bool {
 
 func (i *interaction) AddConstraint(constraint interactionConstraint) {
 	i.constraints.Store(constraint.Key(), constraint)
+}
+
+func (i *interaction) AddModifier(modifier *interactionModifier) {
+	i.modifiers.Store(modifier.Key(), modifier)
 }
 
 func (i *interaction) loadValuesFromSource(constraint interactionConstraint, interactions *Interactions) ([]interface{}, error) {

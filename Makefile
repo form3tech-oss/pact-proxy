@@ -8,6 +8,8 @@ export GO111MODULE=on
 export GOPRIVATE=github.com/form3tech-oss
 export GOFLAGS=-mod=vendor
 
+DOCKER_IMG ?= form3tech/pact-proxy
+
 ifeq (${platform},Darwin)
 PACT_FILE := "pact-${PACT_VERSION}-osx.tar.gz"
 else
@@ -49,3 +51,9 @@ install-pact:
         echo "pact not installed, installing..."; \
         wget --quiet https://github.com/pact-foundation/pact-ruby-standalone/releases/download/v${PACT_VERSION}/${PACT_FILE} -O /tmp/pactserver.tar.gz && tar -xzf /tmp/pactserver.tar.gz 2>/dev/null -C .; \
     fi
+
+.PHONY: publish
+publish:
+	docker build -t $(DOCKER_IMG):$(TRAVIS_TAG) .
+	echo "$(DOCKER_PASSWORD)" | docker login -u "$(DOCKER_USERNAME)" --password-stdin
+	docker push $(DOCKER_IMG):$(TRAVIS_TAG)
