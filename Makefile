@@ -34,13 +34,6 @@ goimports: install-goimports
 install-goimports:
 	@type goimports >/dev/null 2>&1 || (cd /tmp && go get golang.org/x/tools/cmd/goimports && cd -)
 
-.PHONY: docker-package
-docker-package: build
-	@echo "==> Building docker image..."
-	@for f in ./cmd/*/; do \
-		./scripts/docker-package.sh "$$f"; \
-	done
-
 .PHONY: vendor
 vendor:
 	@go mod tidy && go mod vendor && go mod verify
@@ -54,6 +47,9 @@ install-pact:
 
 .PHONY: publish
 publish:
-	docker build -t $(DOCKER_IMG):$(TRAVIS_TAG) .
+	@echo "==> Building docker image..."
+	docker build --build-arg APPNAME=pact-proxy -f build/package/pact-proxy/Dockerfile -t $(DOCKER_IMG):$(TRAVIS_TAG) .
+	@echo "==> Logging in to the docker registry..."
 	echo "$(DOCKER_PASSWORD)" | docker login -u "$(DOCKER_USERNAME)" --password-stdin
+	@echo "==> Pushing built image..."
 	docker push $(DOCKER_IMG):$(TRAVIS_TAG)
