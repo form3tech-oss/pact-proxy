@@ -8,18 +8,19 @@ cache:
   directories:
     - "$GOPATH/pkg/mod"
     - "$HOME/.cache/go-build"
+services:
+  - docker
 install:
   - if [[ -a .git/shallow ]]; then git fetch --unshallow --tags; fi
-
 jobs:
   include:
     - stage: test
       name: Go Test
       script:
         - make test
-
-    - stage: publish
-      name: Publish
-      if: "env(TRAVIS_TAG) IS present"
-      script:
-        - make publish
+deploy:
+  - provider: script
+    skip_cleanup: true
+    script: make publish
+    on:
+      tags: true
