@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/form3tech-oss/pact-proxy/internal/app/httpresponse"
@@ -15,18 +16,20 @@ import (
 )
 
 func StartProxy(server *http.ServeMux, target *url.URL) {
+	modifyResponseMutex := sync.Mutex{}
 	interactions := &Interactions{}
 
 	proxy := httputil.NewSingleHostReverseProxy(target)
 	notify := NewNotify()
 
 	server.HandleFunc("/interactions/verification", func(res http.ResponseWriter, req *http.Request) {
+		modifyResponseMutex.Lock()
+		defer modifyResponseMutex.Unlock()
 		proxy.ModifyResponse = nil
 		proxy.ServeHTTP(res, req)
 	})
 
 	server.HandleFunc("/interactions/constraints", func(res http.ResponseWriter, req *http.Request) {
-		proxy.ModifyResponse = nil
 		constraintBytes, err := ioutil.ReadAll(req.Body)
 		if err != nil {
 			httpresponse.Errorf(res, http.StatusBadRequest, "unable to read constraint. %s", err.Error())
@@ -50,7 +53,6 @@ func StartProxy(server *http.ServeMux, target *url.URL) {
 	})
 
 	server.HandleFunc("/interactions/modifiers", func(res http.ResponseWriter, req *http.Request) {
-		proxy.ModifyResponse = nil
 		modifierBytes, err := ioutil.ReadAll(req.Body)
 		if err != nil {
 			httpresponse.Errorf(res, http.StatusBadRequest, "unable to read modifier. %s", err.Error())
@@ -74,6 +76,8 @@ func StartProxy(server *http.ServeMux, target *url.URL) {
 	})
 
 	server.HandleFunc("/session", func(res http.ResponseWriter, req *http.Request) {
+		modifyResponseMutex.Lock()
+		defer modifyResponseMutex.Unlock()
 		proxy.ModifyResponse = nil
 		if req.Method == http.MethodDelete {
 			log.Infof("deleting session for %s", target)
@@ -83,8 +87,11 @@ func StartProxy(server *http.ServeMux, target *url.URL) {
 	})
 
 	server.HandleFunc("/interactions", func(res http.ResponseWriter, req *http.Request) {
+		modifyResponseMutex.Lock()
+		defer modifyResponseMutex.Unlock()
 		proxy.ModifyResponse = nil
 		if req.Method == http.MethodDelete {
+			log.Info("deleting interactions")
 			proxy.ServeHTTP(res, req)
 			interactions.Clear()
 			return
@@ -125,7 +132,6 @@ func StartProxy(server *http.ServeMux, target *url.URL) {
 	})
 
 	server.HandleFunc("/interactions/wait", func(res http.ResponseWriter, req *http.Request) {
-		proxy.ModifyResponse = nil
 		waitFor := req.URL.Query().Get("interaction")
 		waitForCount, err := strconv.Atoi(req.URL.Query().Get("count"))
 		if err != nil {
@@ -234,9 +240,11 @@ func StartProxy(server *http.ServeMux, target *url.URL) {
 		}
 
 		notify.Notify()
+		modifyResponseMutex.Lock()
 		proxy.ModifyResponse = modifyResponseFunc(modifiers)
 		defer func() {
 			proxy.ModifyResponse = nil
+			modifyResponseMutex.Unlock()
 		}()
 
 		proxy.ServeHTTP(res, req)
@@ -252,11 +260,13 @@ func modifyResponseFunc(modifiers []*interactionModifier) func(response *http.Re
 			}
 			b, err := ioutil.ReadAll(response.Body)
 			if err != nil {
+				log.Error(err)
 				return err
 			}
 
 			modifiedBody, err := modifier.modifyBody(b)
 			if err != nil {
+				log.Error(err)
 				return err
 			}
 
