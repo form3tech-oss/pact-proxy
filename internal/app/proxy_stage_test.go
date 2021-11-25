@@ -1,6 +1,8 @@
 package app
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -225,11 +227,13 @@ func (s *ProxyStage) n_requests_are_sent_with_modifiers_using_the_body(n int, bo
 	})
 }
 
-func (s *ProxyStage) pact_verification_is_successful() {
+func (s *ProxyStage) pact_verification_is_successful() *ProxyStage {
 	if s.pactResult != nil {
 		s.t.Error(s.pactResult)
 		s.t.Fail()
 	}
+
+	return s
 }
 
 func (s *ProxyStage) pact_verification_is_not_successful() {
@@ -404,4 +408,27 @@ func (s *ProxyStage) n_responses_were_received(n int) *ProxyStage {
 	}
 
 	return s
+}
+
+func (s *ProxyStage) pact_can_be_generated() {
+	u := fmt.Sprintf("http://localhost:%s/pact", proxyURL.Port())
+	req, err := http.NewRequestWithContext(context.Background(),"POST", u, bytes.NewReader([]byte("{\"pact_specification_version\":\"3.0.0\"}")))
+	if err != nil {
+		s.t.Error(err)
+		return
+	}
+
+	req.Header.Add("X-Pact-Mock-Service", "true")
+	req.Header.Add("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		s.t.Error(err)
+		return
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		s.t.Fatalf("Expected 200 but returned %d status code", resp.StatusCode)
+	}
+
+	defer func() { _ = resp.Body.Close() }()
 }
