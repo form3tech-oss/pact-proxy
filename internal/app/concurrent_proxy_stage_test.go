@@ -56,6 +56,12 @@ func NewConcurrentProxyStage(t *testing.T) (*ConcurrentProxyStage, *ConcurrentPr
 		pact:  pact,
 		proxy: proxy,
 	}
+
+	t.Cleanup(func() {
+		pactproxy.Configuration(adminURL.String()).Reset()
+		pact.Teardown()
+	})
+
 	return s, s, s
 }
 

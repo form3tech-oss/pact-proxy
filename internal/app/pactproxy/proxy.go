@@ -30,9 +30,6 @@ func StartProxy(server *http.ServeMux, target *url.URL) {
 	})
 
 	server.HandleFunc("/interactions/constraints", func(res http.ResponseWriter, req *http.Request) {
-		modifyResponseMutex.Lock()
-		defer modifyResponseMutex.Unlock()
-		proxy.ModifyResponse = nil
 		constraintBytes, err := ioutil.ReadAll(req.Body)
 		if err != nil {
 			httpresponse.Errorf(res, http.StatusBadRequest, "unable to read constraint. %s", err.Error())
@@ -56,9 +53,6 @@ func StartProxy(server *http.ServeMux, target *url.URL) {
 	})
 
 	server.HandleFunc("/interactions/modifiers", func(res http.ResponseWriter, req *http.Request) {
-		modifyResponseMutex.Lock()
-		defer modifyResponseMutex.Unlock()
-		proxy.ModifyResponse = nil
 		modifierBytes, err := ioutil.ReadAll(req.Body)
 		if err != nil {
 			httpresponse.Errorf(res, http.StatusBadRequest, "unable to read modifier. %s", err.Error())
@@ -137,9 +131,6 @@ func StartProxy(server *http.ServeMux, target *url.URL) {
 	})
 
 	server.HandleFunc("/interactions/wait", func(res http.ResponseWriter, req *http.Request) {
-		modifyResponseMutex.Lock()
-		defer modifyResponseMutex.Unlock()
-		proxy.ModifyResponse = nil
 		waitFor := req.URL.Query().Get("interaction")
 		waitForCount, err := strconv.Atoi(req.URL.Query().Get("count"))
 		if err != nil {
