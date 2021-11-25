@@ -24,8 +24,6 @@ type ConcurrentProxyStage struct {
 	concurrentUserRequestsDuration     time.Duration
 	concurrentAddressRequestsPerSecond int
 	concurrentAddressRequestsDuration  time.Duration
-	userPactResult                     error
-	addressPactResult                  error
 	userResponses                      []*http.Response
 	addressResponses                   []*http.Response
 }
@@ -130,33 +128,32 @@ func (s *ConcurrentProxyStage) x_concurrent_address_requests_per_second_are_made
 }
 
 func (s *ConcurrentProxyStage) the_concurrent_requests_are_sent() {
-	wg := sync.WaitGroup{}
+	err := s.pact.Verify(func() (err error) {
+		s.proxy.ForInteraction(PostNamePact).AddModifier("$.status", fmt.Sprintf("%d", s.modifiedNameStatusCode), nil)
+		s.proxy.ForInteraction(PostAddressPact).AddModifier("$.status", fmt.Sprintf("%d", s.modifiedAddressStatusCode), nil)
 
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		s.userPactResult = s.pact.Verify(func() (err error) {
-			i := s.proxy.ForInteraction(PostNamePact)
-			i.AddModifier("$.status", fmt.Sprintf("%d", s.modifiedNameStatusCode), nil)
+		wg := sync.WaitGroup{}
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
 			sendConcurrentRequests(s.concurrentUserRequestsPerSecond, s.concurrentUserRequestsDuration, s.makeUserRequest)
+		}()
 
-			return nil
-		})
-	}()
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		s.addressPactResult = s.pact.Verify(func() (err error) {
-			i := s.proxy.ForInteraction(PostAddressPact)
-			i.AddModifier("$.status", fmt.Sprintf("%d", s.modifiedAddressStatusCode), nil)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
 			sendConcurrentRequests(s.concurrentAddressRequestsPerSecond, s.concurrentAddressRequestsDuration, s.makeAddressRequest)
+		}()
 
-			return nil
-		})
-	}()
+		wg.Wait()
 
-	wg.Wait()
+		return nil
+	})
+
+	if err != nil {
+		s.t.Error(err)
+	}
 }
 
 func (s *ConcurrentProxyStage) makeUserRequest() {
