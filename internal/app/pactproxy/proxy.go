@@ -91,6 +91,7 @@ func StartProxy(server *http.ServeMux, target *url.URL) {
 		defer modifyResponseMutex.Unlock()
 		proxy.ModifyResponse = nil
 		if req.Method == http.MethodDelete {
+			log.Info("deleting interactions")
 			proxy.ServeHTTP(res, req)
 			interactions.Clear()
 			return
