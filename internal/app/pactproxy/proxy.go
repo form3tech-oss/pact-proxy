@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/form3tech-oss/pact-proxy/internal/app/httpresponse"
@@ -15,17 +16,22 @@ import (
 )
 
 func StartProxy(server *http.ServeMux, target *url.URL) {
+	modifyResponseMutex := sync.Mutex{}
 	interactions := &Interactions{}
 
 	proxy := httputil.NewSingleHostReverseProxy(target)
 	notify := NewNotify()
 
 	server.HandleFunc("/interactions/verification", func(res http.ResponseWriter, req *http.Request) {
+		modifyResponseMutex.Lock()
+		defer modifyResponseMutex.Unlock()
 		proxy.ModifyResponse = nil
 		proxy.ServeHTTP(res, req)
 	})
 
 	server.HandleFunc("/interactions/constraints", func(res http.ResponseWriter, req *http.Request) {
+		modifyResponseMutex.Lock()
+		defer modifyResponseMutex.Unlock()
 		proxy.ModifyResponse = nil
 		constraintBytes, err := ioutil.ReadAll(req.Body)
 		if err != nil {
@@ -50,6 +56,8 @@ func StartProxy(server *http.ServeMux, target *url.URL) {
 	})
 
 	server.HandleFunc("/interactions/modifiers", func(res http.ResponseWriter, req *http.Request) {
+		modifyResponseMutex.Lock()
+		defer modifyResponseMutex.Unlock()
 		proxy.ModifyResponse = nil
 		modifierBytes, err := ioutil.ReadAll(req.Body)
 		if err != nil {
@@ -74,6 +82,8 @@ func StartProxy(server *http.ServeMux, target *url.URL) {
 	})
 
 	server.HandleFunc("/session", func(res http.ResponseWriter, req *http.Request) {
+		modifyResponseMutex.Lock()
+		defer modifyResponseMutex.Unlock()
 		proxy.ModifyResponse = nil
 		if req.Method == http.MethodDelete {
 			log.Infof("deleting session for %s", target)
@@ -83,6 +93,8 @@ func StartProxy(server *http.ServeMux, target *url.URL) {
 	})
 
 	server.HandleFunc("/interactions", func(res http.ResponseWriter, req *http.Request) {
+		modifyResponseMutex.Lock()
+		defer modifyResponseMutex.Unlock()
 		proxy.ModifyResponse = nil
 		if req.Method == http.MethodDelete {
 			proxy.ServeHTTP(res, req)
@@ -125,6 +137,8 @@ func StartProxy(server *http.ServeMux, target *url.URL) {
 	})
 
 	server.HandleFunc("/interactions/wait", func(res http.ResponseWriter, req *http.Request) {
+		modifyResponseMutex.Lock()
+		defer modifyResponseMutex.Unlock()
 		proxy.ModifyResponse = nil
 		waitFor := req.URL.Query().Get("interaction")
 		waitForCount, err := strconv.Atoi(req.URL.Query().Get("count"))
@@ -234,9 +248,11 @@ func StartProxy(server *http.ServeMux, target *url.URL) {
 		}
 
 		notify.Notify()
+		modifyResponseMutex.Lock()
 		proxy.ModifyResponse = modifyResponseFunc(modifiers)
 		defer func() {
 			proxy.ModifyResponse = nil
+			modifyResponseMutex.Unlock()
 		}()
 
 		proxy.ServeHTTP(res, req)
