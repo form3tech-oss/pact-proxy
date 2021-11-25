@@ -252,11 +252,13 @@ func modifyResponseFunc(modifiers []*interactionModifier) func(response *http.Re
 			}
 			b, err := ioutil.ReadAll(response.Body)
 			if err != nil {
+				log.Error(err)
 				return err
 			}
 
 			modifiedBody, err := modifier.modifyBody(b)
 			if err != nil {
+				log.Error(err)
 				return err
 			}
 
