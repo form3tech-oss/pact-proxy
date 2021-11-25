@@ -22,12 +22,15 @@ func StartProxy(server *http.ServeMux, target *url.URL) {
 	proxy := httputil.NewSingleHostReverseProxy(target)
 	notify := NewNotify()
 
-	server.HandleFunc("/interactions/verification", func(res http.ResponseWriter, req *http.Request) {
+	proxyPass := func(res http.ResponseWriter, req *http.Request) {
 		modifyResponseMutex.Lock()
 		defer modifyResponseMutex.Unlock()
 		proxy.ModifyResponse = nil
 		proxy.ServeHTTP(res, req)
-	})
+	}
+
+	server.HandleFunc("/interactions/verification", proxyPass)
+	server.HandleFunc("/pact", proxyPass)
 
 	server.HandleFunc("/interactions/constraints", func(res http.ResponseWriter, req *http.Request) {
 		constraintBytes, err := ioutil.ReadAll(req.Body)

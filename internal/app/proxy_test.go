@@ -15,7 +15,9 @@ func TestConstraintMatches(t *testing.T) {
 		a_constaint_is_added("sam").and().
 		a_request_is_sent_using_the_name("sam")
 
-	then.pact_verification_is_successful()
+	then.
+		pact_verification_is_successful().and().
+		pact_can_be_generated()
 }
 
 func TestConstraintDoesntMatch(t *testing.T) {
