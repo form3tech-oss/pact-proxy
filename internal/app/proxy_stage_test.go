@@ -412,7 +412,7 @@ func (s *ProxyStage) n_responses_were_received(n int) *ProxyStage {
 
 func (s *ProxyStage) pact_can_be_generated() {
 	u := fmt.Sprintf("http://localhost:%s/pact", proxyURL.Port())
-	req, err := http.NewRequestWithContext(context.Background(),"POST", u, bytes.NewReader([]byte("{\"pact_specification_version\":\"3.0.0\"}")))
+	req, err := http.NewRequestWithContext(context.Background(), "POST", u, bytes.NewReader([]byte("{\"pact_specification_version\":\"3.0.0\"}")))
 	if err != nil {
 		s.t.Error(err)
 		return

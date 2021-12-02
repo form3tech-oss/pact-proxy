@@ -8,7 +8,6 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/form3tech-oss/pact-proxy/internal/app/httpresponse"
@@ -16,16 +15,12 @@ import (
 )
 
 func StartProxy(server *http.ServeMux, target *url.URL) {
-	modifyResponseMutex := sync.Mutex{}
 	interactions := &Interactions{}
 
 	proxy := httputil.NewSingleHostReverseProxy(target)
 	notify := NewNotify()
 
 	proxyPass := func(res http.ResponseWriter, req *http.Request) {
-		modifyResponseMutex.Lock()
-		defer modifyResponseMutex.Unlock()
-		proxy.ModifyResponse = nil
 		proxy.ServeHTTP(res, req)
 	}
 
@@ -75,13 +70,10 @@ func StartProxy(server *http.ServeMux, target *url.URL) {
 		}
 
 		log.Infof("adding modifier to interaction '%s'", interaction.Description)
-		interaction.AddModifier(modifier)
+		interaction.Modifiers.AddModifier(modifier)
 	})
 
 	server.HandleFunc("/session", func(res http.ResponseWriter, req *http.Request) {
-		modifyResponseMutex.Lock()
-		defer modifyResponseMutex.Unlock()
-		proxy.ModifyResponse = nil
 		if req.Method == http.MethodDelete {
 			log.Infof("deleting session for %s", target)
 			proxy.ServeHTTP(res, req)
@@ -90,9 +82,6 @@ func StartProxy(server *http.ServeMux, target *url.URL) {
 	})
 
 	server.HandleFunc("/interactions", func(res http.ResponseWriter, req *http.Request) {
-		modifyResponseMutex.Lock()
-		defer modifyResponseMutex.Unlock()
-		proxy.ModifyResponse = nil
 		if req.Method == http.MethodDelete {
 			log.Info("deleting interactions")
 			proxy.ServeHTTP(res, req)
@@ -215,19 +204,12 @@ func StartProxy(server *http.ServeMux, target *url.URL) {
 		}
 
 		unmatched := make(map[string][]string)
-		modifiers := make([]*interactionModifier, 0)
+		matched := make([]*interaction, 0)
 		for _, interaction := range allInteractions {
 			ok, info := interaction.EvaluateConstrains(request, interactions)
 			if ok {
-				log.Infof("interaction '%s' matched to '%s %s'", interaction.Description, req.Method, req.URL.Path)
 				interaction.StoreRequest(request)
-				interaction.modifiers.Range(func(key, value interface{}) bool {
-					modifier, ok := value.(*interactionModifier)
-					if ok {
-						modifiers = append(modifiers, modifier)
-					}
-					return true
-				})
+				matched = append(matched, interaction)
 			} else {
 				unmatched[interaction.Description] = info
 			}
@@ -243,45 +225,6 @@ func StartProxy(server *http.ServeMux, target *url.URL) {
 		}
 
 		notify.Notify()
-		modifyResponseMutex.Lock()
-		proxy.ModifyResponse = modifyResponseFunc(modifiers)
-		defer func() {
-			proxy.ModifyResponse = nil
-			modifyResponseMutex.Unlock()
-		}()
-
-		proxy.ServeHTTP(res, req)
+		proxy.ServeHTTP(&ResponseModificationWriter{res: res, interactions: matched}, req)
 	})
-}
-
-func modifyResponseFunc(modifiers []*interactionModifier) func(response *http.Response) error {
-	return func(response *http.Response) error {
-		for _, modifier := range modifiers {
-			if ok, modifiedStatusCode := modifier.modifyStatusCode(); ok {
-				response.StatusCode = modifiedStatusCode
-				continue
-			}
-			b, err := ioutil.ReadAll(response.Body)
-			if err != nil {
-				log.Error(err)
-				return err
-			}
-
-			modifiedBody, err := modifier.modifyBody(b)
-			if err != nil {
-				log.Error(err)
-				return err
-			}
-
-			response.Body = ioutil.NopCloser(bytes.NewBuffer(modifiedBody))
-
-			lenBody := len(modifiedBody)
-			if len(b) != lenBody {
-				response.ContentLength = int64(lenBody)
-				response.Header.Set("Content-Length", strconv.Itoa(lenBody))
-			}
-		}
-
-		return nil
-	}
 }
