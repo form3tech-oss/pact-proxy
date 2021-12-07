@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -125,7 +126,7 @@ func (p *PactProxy) WaitForInteraction(interaction string, count int) error {
 		return err
 	}
 	if res.StatusCode != http.StatusOK {
-		return errors.New("fail")
+		return errors.New(fmt.Sprintf("did not see %d interactions for %s", count, interaction))
 	}
 	return nil
 }
