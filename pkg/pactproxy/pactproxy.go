@@ -113,6 +113,7 @@ func (p *PactProxy) WaitForAll() error {
 	return nil
 }
 
+// WaitForInteraction will wait for interaction to be seen count times
 func (p *PactProxy) WaitForInteraction(interaction string, count int) error {
 	q := url.Values{}
 	q.Add("interaction", interaction)
