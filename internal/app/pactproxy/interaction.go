@@ -41,7 +41,7 @@ type interaction struct {
 	Description  string
 	definition   map[string]interface{}
 	constraints  sync.Map
-	modifiers    sync.Map
+	Modifiers    *interactionModifiers
 	lastRequest  atomic.Value
 	requestCount int32
 }
@@ -88,6 +88,11 @@ func LoadInteraction(data []byte, alias string) (*interaction, error) {
 		Description: description,
 	}
 
+	interaction.Modifiers = &interactionModifiers{
+		interaction: interaction,
+		modifiers:   sync.Map{},
+	}
+
 	if requestBody, hasRequestBody := request["body"]; hasRequestBody {
 		interaction.addConstraintsFromPact("$.body", matchingRules.(map[string]interface{}), requestBody.(map[string]interface{}))
 	}
@@ -126,10 +131,6 @@ func (i *interaction) Match(path, method string) bool {
 
 func (i *interaction) AddConstraint(constraint interactionConstraint) {
 	i.constraints.Store(constraint.Key(), constraint)
-}
-
-func (i *interaction) AddModifier(modifier *interactionModifier) {
-	i.modifiers.Store(modifier.Key(), modifier)
 }
 
 func (i *interaction) loadValuesFromSource(constraint interactionConstraint, interactions *Interactions) ([]interface{}, error) {

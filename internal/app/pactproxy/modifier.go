@@ -2,21 +2,25 @@ package pactproxy
 
 import (
 	"encoding/json"
-	"fmt"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 
 	"github.com/pkg/errors"
 	"github.com/tidwall/sjson"
 )
 
 type interactionModifier struct {
-	Interaction     string `json:"interaction"`
-	Path            string `json:"path"`
-	Value           string `json:"value"`
-	Attempt         *int   `json:"attempt"`
-	countStatusCode int
-	countBody       int
+	Interaction string `json:"interaction"`
+	Path        string `json:"path"`
+	Value       string `json:"value"`
+	Attempt     *int   `json:"attempt"`
+}
+
+type interactionModifiers struct {
+	interaction *interaction
+	modifiers   sync.Map
 }
 
 func loadModifier(data []byte) (*interactionModifier, error) {
@@ -28,31 +32,46 @@ func loadModifier(data []byte) (*interactionModifier, error) {
 	return modifier, nil
 }
 
-func (i *interactionModifier) Key() string {
-	return strings.Join([]string{i.Interaction, i.Path}, "_")
+func (im *interactionModifier) Key() string {
+	return strings.Join([]string{im.Interaction, im.Path}, "_")
 }
 
-func (i *interactionModifier) modifyBody(b []byte) ([]byte, error) {
-	if len(i.Path) < 7 {
-		return nil, fmt.Errorf("invalid path: %s", i.Path)
-	}
-	if i.Path[:7] == "$.body." {
-		i.countBody++
-		if i.Attempt == nil || *i.Attempt == i.countBody {
-			out, err := sjson.SetBytes(b, i.Path[7:], i.Value)
-			return out, err
+func (ims *interactionModifiers) AddModifier(modifier *interactionModifier) {
+	ims.modifiers.Store(modifier.Key(), modifier)
+}
+
+func (ims *interactionModifiers) Modifiers() []*interactionModifier {
+	var result []*interactionModifier
+	ims.modifiers.Range(func(_, v interface{}) bool {
+		result = append(result, v.(*interactionModifier))
+		return true
+	})
+	return result
+}
+
+func (ims *interactionModifiers) modifyBody(b []byte) ([]byte, error) {
+	for _, m := range ims.Modifiers() {
+		if strings.HasPrefix(m.Path, "$.body.") {
+			if m.Attempt == nil || *m.Attempt == int(atomic.LoadInt32(&ims.interaction.requestCount)) {
+				var err error
+				b, err = sjson.SetBytes(b, m.Path[7:], m.Value)
+				if err != nil {
+					return nil, err
+				}
+			}
 		}
 	}
 	return b, nil
 }
 
-func (i *interactionModifier) modifyStatusCode() (bool, int) {
-	if i.Path == "$.status" {
-		i.countStatusCode++
-		if i.Attempt == nil || *i.Attempt == i.countStatusCode {
-			code, err := strconv.Atoi(i.Value)
-			if err == nil {
-				return true, code
+func (ims *interactionModifiers) modifyStatusCode() (bool, int) {
+	for _, m := range ims.Modifiers() {
+		if m.Path == "$.status" {
+			if m.Attempt == nil || *m.Attempt == int(atomic.LoadInt32(&ims.interaction.requestCount)) {
+				code, err := strconv.Atoi(m.Value)
+				if err == nil {
+					return true, code
+				}
 			}
 		}
 	}
