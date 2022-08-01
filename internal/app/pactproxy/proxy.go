@@ -134,6 +134,7 @@ func StartProxy(server *http.ServeMux, target *url.URL) {
 			interaction, ok := interactions.Load(waitFor)
 			if !ok {
 				httpresponse.Errorf(res, http.StatusBadRequest, "cannot wait for interaction '%s', interaction not found.", waitFor)
+				return
 			}
 
 			log.Infof("waiting for %s", waitFor)
