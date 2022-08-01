@@ -55,7 +55,7 @@ func (p *PactProxy) addConstraint(interaction, pactPath, value string) {
 	}
 }
 
-func (p *PactProxy) addModifier(interaction, path, value string, attempt *int) {
+func (p *PactProxy) addModifier(interaction, path string, value interface{}, attempt *int) {
 	body := map[string]interface{}{
 		"interaction": interaction,
 		"path":        path,
@@ -136,7 +136,7 @@ func (s InteractionSetup) AddConstraint(path, value string) InteractionSetup {
 	return s
 }
 
-func (s InteractionSetup) AddModifier(path, value string, attempt *int) InteractionSetup {
+func (s InteractionSetup) AddModifier(path string, value interface{}, attempt *int) InteractionSetup {
 	s.pactProxy.addModifier(s.interaction, path, value, attempt)
 	return s
 }
