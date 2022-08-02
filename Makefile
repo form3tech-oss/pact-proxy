@@ -2,9 +2,8 @@ PLATFORM                 := $(shell uname)
 NAME                     := $(shell basename $(CURDIR))
 GOFMT_FILES              ?= $$(find ./ -name '*.go' | grep -v vendor | grep -v externalmodels)
 GOTEST_DIRECTORIES       ?= $$(find ./internal/ -type f -iname "*_test.go" -exec dirname {} \; | uniq)
-PACT_VERSION             ?= "1.88.45"
+PACT_VERSION             ?= "1.88.90"
 
-export GO111MODULE=on
 export GOPRIVATE=github.com/form3tech-oss
 export GOFLAGS=-mod=vendor
 
