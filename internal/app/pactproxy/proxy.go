@@ -14,12 +14,19 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+const (
+	defaultDelay    = 500 * time.Millisecond
+	defaultDuration = 15 * time.Second
+)
+
 func StartProxy(server *http.ServeMux, target *url.URL) {
 	api := api{
 		target:       target,
 		proxy:        httputil.NewSingleHostReverseProxy(target),
 		interactions: &Interactions{},
 		notify:       NewNotify(),
+		delay:        defaultDelay,
+		duration:     defaultDuration,
 	}
 
 	for path, handler := range map[string]func(http.ResponseWriter, *http.Request){
@@ -41,6 +48,8 @@ type api struct {
 	proxy        *httputil.ReverseProxy
 	interactions *Interactions
 	notify       *notify
+	delay        time.Duration
+	duration     time.Duration
 }
 
 func (a *api) proxyPassHandler(res http.ResponseWriter, req *http.Request) {
@@ -165,7 +174,7 @@ func (a *api) interactionsWaitHandler(res http.ResponseWriter, req *http.Request
 				a.notify.Wait(timeLeft)
 			}
 			return false
-		}, 500*time.Millisecond, 15*time.Second)
+		}, a.delay, a.duration)
 
 		if !interaction.HasRequests(waitForCount) {
 			httpresponse.Error(res, http.StatusRequestTimeout, "timeout waiting for interactions to be met")
@@ -183,7 +192,7 @@ func (a *api) interactionsWaitHandler(res http.ResponseWriter, req *http.Request
 			a.notify.Wait(timeLeft)
 		}
 		return false
-	}, 500*time.Millisecond, 15*time.Second)
+	}, a.delay, a.duration)
 
 	if !a.interactions.AllHaveRequests() {
 		for _, i := range a.interactions.All() {
