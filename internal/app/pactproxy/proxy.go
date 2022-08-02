@@ -118,7 +118,7 @@ func (a *api) interactionsHandler(res http.ResponseWriter, req *http.Request) {
 
 		interaction, err := LoadInteraction(data, req.URL.Query().Get("alias"))
 		if err != nil {
-			httpresponse.Errorf(res, http.StatusBadRequest, "unable to read interaction. %s", err.Error())
+			httpresponse.Errorf(res, http.StatusBadRequest, "unable to load interaction. %s", err.Error())
 			return
 		}
 
@@ -144,13 +144,12 @@ func (a *api) interactionsHandler(res http.ResponseWriter, req *http.Request) {
 }
 
 func (a *api) interactionsWaitHandler(res http.ResponseWriter, req *http.Request) {
-	waitFor := req.URL.Query().Get("interaction")
 	waitForCount, err := strconv.Atoi(req.URL.Query().Get("count"))
 	if err != nil {
 		waitForCount = 1
 	}
 
-	if waitFor != "" {
+	if waitFor := req.URL.Query().Get("interaction"); waitFor != "" {
 		interaction, ok := a.interactions.Load(waitFor)
 		if !ok {
 			httpresponse.Errorf(res, http.StatusBadRequest, "cannot wait for interaction '%s', interaction not found.", waitFor)
@@ -171,6 +170,7 @@ func (a *api) interactionsWaitHandler(res http.ResponseWriter, req *http.Request
 		if !interaction.HasRequests(waitForCount) {
 			httpresponse.Error(res, http.StatusRequestTimeout, "timeout waiting for interactions to be met")
 		}
+
 		return
 	}
 
