@@ -4,7 +4,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/avast/retry-go"
+	"github.com/avast/retry-go/v4"
 )
 
 func retryFor(do func(time.Duration) bool, delay, duration time.Duration) bool {

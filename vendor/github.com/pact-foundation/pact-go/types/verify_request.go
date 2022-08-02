@@ -14,15 +14,20 @@ import (
 // Hook functions are used to tap into the lifecycle of a Consumer or Provider test
 type Hook func() error
 
-// VerifyRequest contains the verification params.
+// VerifyRequest configures the pact verification process.
+//
 type VerifyRequest struct {
 	// URL to hit during provider verification.
 	ProviderBaseURL string
 
 	// Local/HTTP paths to Pact files.
+	// NOTE: if specified alongside BrokerURL it will run the verification once for
+	// each dynamic pact (Broker) discovered and user specified (URL) pact.
 	PactURLs []string
 
 	// Pact Broker URL for broker-based verification
+	// NOTE: if specified alongside PactURLs it will run the verification once for
+	// each dynamic pact (Broker) discovered and user specified (URL) pact.
 	BrokerURL string
 
 	// Selectors are the way we specify which pacticipants and
@@ -35,6 +40,9 @@ type VerifyRequest struct {
 
 	// Tags to apply to the provider application version
 	ProviderTags []string
+
+	// Branch to apply to the provider application version
+	ProviderBranch string
 
 	// ProviderStatesSetupURL is the endpoint to post current provider state
 	// to on the Provider API.
@@ -117,6 +125,9 @@ type VerifyRequest struct {
 	// Verbose increases verbosity of output
 	// Deprecated
 	Verbose bool
+
+	// Tag the provider with the current git branch in the Pact Broker
+	TagWithGitBranch bool
 
 	// Arguments to the VerificationProvider
 	// Deprecated: This will be deleted after the native library replaces Ruby deps.
@@ -218,6 +229,10 @@ func (v *VerifyRequest) Validate() error {
 		v.Args = append(v.Args, "--provider-version-tag", tag)
 	}
 
+	if v.ProviderBranch != "" {
+		v.Args = append(v.Args, "--provider-version-branch", v.ProviderBranch)
+	}
+
 	if v.EnablePending {
 		v.Args = append(v.Args, "--enable-pending")
 	}
@@ -232,6 +247,10 @@ func (v *VerifyRequest) Validate() error {
 
 	if v.PactLogLevel != "" {
 		v.Args = append(v.Args, "--log-level", v.PactLogLevel)
+	}
+
+	if v.TagWithGitBranch {
+		v.Args = append(v.Args, "--tag-with-git-branch", "true")
 	}
 
 	return nil
