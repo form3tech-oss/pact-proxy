@@ -216,6 +216,8 @@ func (a *api) indexHandler(res http.ResponseWriter, req *http.Request) {
 	}
 
 	if mediaType != "application/json" {
+		// proxy non-json requests directly
+		// todo refactor to enable response modification
 		a.proxy.ServeHTTP(res, req)
 		return
 	}

@@ -171,9 +171,24 @@ func TestTextPlainContentType(t *testing.T) {
 		a_request_is_sent_in_plain_text()
 
 	then.
-		n_responses_were_received(1).and().
 		the_response_is_(http.StatusOK).and().
 		the_response_body_is([]byte("text")).and().
-		pact_verification_is_successful().and().
-		pact_can_be_generated()
+		pact_verification_is_successful()
+}
+
+func TestModifiedStatusCodeWithPlainTextBody(t *testing.T) {
+	given, when, then, teardown := NewProxyStage(t)
+	defer teardown()
+
+	given.
+		a_pact_that_expects_plain_text().and().
+		a_modified_response_status_of_(http.StatusInternalServerError)
+
+	when.
+		a_request_is_sent_in_plain_text()
+
+	then.
+		the_response_is_(http.StatusInternalServerError).and().
+		the_response_body_is([]byte("text")).and().
+		pact_verification_is_successful()
 }
