@@ -159,3 +159,21 @@ func TestModifiedBodyWithFirstAndLastName_ForNRequests(t *testing.T) {
 		the_nth_response_body_has_(3, "last_name", "any").and().
 		pact_verification_is_successful()
 }
+
+func TestTextPlainContentType(t *testing.T) {
+	given, when, then, teardown := NewProxyStage(t)
+	defer teardown()
+
+	given.
+		a_pact_that_expects_plain_text()
+
+	when.
+		a_request_is_sent_in_plain_text()
+
+	then.
+		n_responses_were_received(1).and().
+		the_response_is_(http.StatusOK).and().
+		the_response_body_is([]byte("text")).and().
+		pact_verification_is_successful().and().
+		pact_can_be_generated()
+}

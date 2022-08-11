@@ -3,6 +3,7 @@ package pactproxy
 import (
 	"bytes"
 	"io/ioutil"
+	"mime"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -207,6 +208,18 @@ func (a *api) interactionsWaitHandler(res http.ResponseWriter, req *http.Request
 
 func (a *api) indexHandler(res http.ResponseWriter, req *http.Request) {
 	log.Infof("proxying %s", req.URL.Path)
+
+	mediaType, _, err := mime.ParseMediaType(req.Header.Get("Content-Type"))
+	if err != nil {
+		httpresponse.Errorf(res, http.StatusBadRequest, "bad Content-Type. %s", err.Error())
+		return
+	}
+
+	if mediaType != "application/json" {
+		a.proxy.ServeHTTP(res, req)
+		return
+	}
+
 	allInteractions, ok := a.interactions.FindAll(req.URL.Path, req.Method)
 	if !ok {
 		httpresponse.Errorf(res, http.StatusBadRequest, "unable to find interaction to Match '%s %s'", req.Method, req.URL.Path)

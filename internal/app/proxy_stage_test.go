@@ -149,6 +149,25 @@ func (s *ProxyStage) a_pact_that_allows_any_address() *ProxyStage {
 	return s
 }
 
+func (s *ProxyStage) a_pact_that_expects_plain_text() *ProxyStage {
+	s.pact.
+		AddInteraction().
+		UponReceiving(PostAddressPact).
+		WithRequest(dsl.Request{
+			Method:  "POST",
+			Path:    dsl.String("/addresses"),
+			Headers: dsl.MapMatcher{"Content-Type": dsl.String("text/plain")},
+			Body:    "text",
+		}).
+		WillRespondWith(dsl.Response{
+			Status:  200,
+			Headers: dsl.MapMatcher{"Content-Type": dsl.String("text/plain")},
+			Body:    "text",
+		})
+	return s
+
+}
+
 func (s *ProxyStage) a_constaint_is_added(name string) *ProxyStage {
 	s.constraintValue = name
 	return s
@@ -165,6 +184,30 @@ func (s *ProxyStage) a_request_is_sent_using_the_name(name string) {
 		}
 
 		req.Header.Set("Content-Type", "application/json")
+
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return err
+		}
+		s.responses = append(s.responses, res)
+		bodyBytes, err := io.ReadAll(res.Body)
+		if err != nil {
+			s.t.Fatalf("unable to read response body, %v", err)
+		}
+		s.responseBodies = append(s.responseBodies, bodyBytes)
+		return nil
+	})
+}
+
+func (s *ProxyStage) a_request_is_sent_in_plain_text() {
+	s.pactResult = s.pact.Verify(func() (err error) {
+		u := fmt.Sprintf("http://localhost:%s/addresses", proxyURL.Port())
+		req, err := http.NewRequest("POST", u, strings.NewReader("text"))
+		if err != nil {
+			return err
+		}
+
+		req.Header.Set("Content-Type", "text/plain")
 
 		res, err := http.DefaultClient.Do(req)
 		if err != nil {
@@ -396,6 +439,23 @@ func (s *ProxyStage) the_nth_response_body_has_(n int, key, value string) *Proxy
 
 	if responseBody[key] != value {
 		s.t.Fatalf("Expected %s on attempt %d,: %s, got: %s", key, n, value, responseBody[key])
+	}
+
+	return s
+}
+
+func (s *ProxyStage) the_response_body_is(data []byte) *ProxyStage {
+	return s.the_nth_response_body_is(1, data)
+}
+
+func (s *ProxyStage) the_nth_response_body_is(n int, data []byte) *ProxyStage {
+	if len(s.responseBodies) < n {
+		s.t.Fatalf("Expected at least %d responses, got %d", n, len(s.responseBodies))
+	}
+
+	body := s.responseBodies[n-1]
+	if c := bytes.Compare(body, data); c != 0 {
+		s.t.Fatalf("Expected body did not match. Expected: %s, got: %s", body, data)
 	}
 
 	return s

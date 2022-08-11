@@ -3,6 +3,7 @@ package pactproxy
 import (
 	"encoding/json"
 	"fmt"
+	"mime"
 	"reflect"
 	"regexp"
 	"sync"
@@ -93,7 +94,12 @@ func LoadInteraction(data []byte, alias string) (*interaction, error) {
 		modifiers:   sync.Map{},
 	}
 
-	if requestBody, hasRequestBody := request["body"]; hasRequestBody {
+	isJSON, err := isJSONRequest(request)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to parse Content-Type")
+	}
+
+	if requestBody, hasRequestBody := request["body"]; hasRequestBody && isJSON {
 		interaction.addConstraintsFromPact("$.body", matchingRules.(map[string]interface{}), requestBody.(map[string]interface{}))
 	}
 
@@ -102,6 +108,30 @@ func LoadInteraction(data []byte, alias string) (*interaction, error) {
 	}
 
 	return interaction, nil
+}
+
+func isJSONRequest(request map[string]interface{}) (bool, error) {
+	headers, hasHeaders := request["headers"]
+	if !hasHeaders {
+		return false, nil
+	}
+
+	parsed, ok := headers.(map[string]string)
+	if !ok {
+		return false, nil
+	}
+
+	contentType, hasContentType := parsed["Content-Type"]
+	if !hasContentType {
+		return false, nil
+	}
+
+	mediaType, _, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		return false, err
+	}
+
+	return mediaType == "application/json", nil
 }
 
 func (i *interaction) addConstraintsFromPact(path string, matchingRules, values map[string]interface{}) {
