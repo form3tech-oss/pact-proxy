@@ -103,10 +103,6 @@ func LoadInteraction(data []byte, alias string) (*interaction, error) {
 		interaction.addConstraintsFromPact("$.body", matchingRules.(map[string]interface{}), requestBody.(map[string]interface{}))
 	}
 
-	if !hasRules {
-		matchingRules = make(map[string]interface{})
-	}
-
 	return interaction, nil
 }
 
