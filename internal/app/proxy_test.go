@@ -12,7 +12,7 @@ func TestConstraintMatches(t *testing.T) {
 	given.a_pact_that_allows_any_names()
 
 	when.
-		a_constaint_is_added("sam").and().
+		a_constraint_is_added("sam").and().
 		a_request_is_sent_using_the_name("sam")
 
 	then.
@@ -27,7 +27,7 @@ func TestConstraintDoesntMatch(t *testing.T) {
 	given.a_pact_that_allows_any_names()
 
 	when.
-		a_constaint_is_added("sam").and().
+		a_constraint_is_added("sam").and().
 		a_request_is_sent_using_the_name("bob")
 
 	then.pact_verification_is_not_successful()
@@ -161,36 +161,74 @@ func TestModifiedBodyWithFirstAndLastName_ForNRequests(t *testing.T) {
 }
 
 func TestTextPlainContentType(t *testing.T) {
+	requestBody := "text"
 	given, when, then, teardown := NewProxyStage(t)
 	defer teardown()
 
 	given.
-		a_pact_that_expects_plain_text()
+		a_pact_that_expects_plain_text(requestBody, requestBody)
 
 	when.
-		a_request_is_sent_in_plain_text()
+		a_request_is_sent_in_plain_text(requestBody)
 
 	then.
 		the_response_is_(http.StatusOK).and().
-		the_response_body_is([]byte("text")).and().
+		the_response_body_is([]byte(requestBody)).and().
 		pact_verification_is_successful()
 }
 
+//TODO: Add test for unsupported content type
 func TestModifiedStatusCodeWithPlainTextBody(t *testing.T) {
 	given, when, then, teardown := NewProxyStage(t)
 	defer teardown()
-
+	requestBody := "plain text body"
 	given.
-		a_pact_that_expects_plain_text().and().
+		a_pact_that_expects_plain_text(requestBody, requestBody).and().
 		a_modified_response_status_of_(http.StatusInternalServerError)
 
 	when.
-		a_request_is_sent_in_plain_text()
+		a_request_is_sent_in_plain_text(requestBody)
 
 	then.
 		the_response_is_(http.StatusInternalServerError).and().
-		the_response_body_is([]byte("text")).and().
+		the_response_body_is([]byte(requestBody)).and().
 		pact_verification_is_successful()
 }
 
 //TODO test also for body matcher :)
+
+func TestPlainTextConstraintMatches(t *testing.T) {
+	given, when, then, teardown := NewProxyStage(t)
+	defer teardown()
+	requestBody := "some file request"
+	responseBody := "some file response"
+	requestConstraint := "some file request"
+
+	given.
+		a_pact_that_expects_plain_text(requestBody, responseBody)
+	when.
+		a_constraint_is_added(requestConstraint).and().
+		a_request_is_sent_in_plain_text(requestConstraint)
+
+	then.
+		the_response_is_(http.StatusOK).and().
+		the_response_body_is([]byte(responseBody)).and().
+		pact_verification_is_successful().and().
+		pact_can_be_generated()
+}
+
+func TestPlainTextConstraintDoesNotMatch(t *testing.T) {
+	given, when, then, teardown := NewProxyStage(t)
+	defer teardown()
+	requestBody := "some file content"
+	responseBody := "some file response"
+	given.
+		a_pact_that_expects_plain_text(requestBody, responseBody)
+	when.
+		a_constraint_is_added("incorrect file content").and().
+		a_request_is_sent_in_plain_text(requestBody)
+
+	then.
+		the_response_is_(http.StatusBadRequest).and().
+		pact_verification_is_not_successful()
+}

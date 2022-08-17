@@ -245,9 +245,7 @@ func (a *api) indexHandler(res http.ResponseWriter, req *http.Request) {
 
 	req.Body = ioutil.NopCloser(bytes.NewBuffer(data))
 
-	LoadPlainTextRequest(data, req.URL)
-
-	request, err := LoadJSONRequest(data, req.URL)
+	request, err := supportedMediaTypes[mediaType](data, req.URL)
 	if err != nil {
 		httpresponse.Errorf(res, http.StatusInternalServerError, "unable to read requestDocument data. %s", err.Error())
 		return

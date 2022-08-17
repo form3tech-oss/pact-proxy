@@ -99,13 +99,19 @@ func LoadInteraction(data []byte, alias string) (*interaction, error) {
 		return nil, errors.Wrap(err, "unable to parse Content-Type")
 	}
 
-	if requestBody, hasRequestBody := request["body"]; hasRequestBody && isJSON {
-		interaction.addConstraintsFromPact("$.body", matchingRules.(map[string]interface{}), requestBody.(map[string]interface{}))
+	requestBody, hasRequestBody := request["body"]
+
+	if hasRequestBody {
+		if isJSON {
+			interaction.addJSONConstraintsFromPact("$.body", matchingRules.(map[string]interface{}), requestBody.(map[string]interface{}))
+		} else {
+			if plaintextReq, ok := requestBody.(string); ok {
+				// TODO body matching rules also for the text mime type - body is string if its plaintext/string type :)
+				// if body is map/ if is string then ++ test
+				interaction.addTextConstraintsFromPact("$.body", matchingRules.(map[string]interface{}), plaintextReq)
+			}
+		}
 	}
-
-	// TODO body matching rules also for the text mime type - body is string if its plaintext/string type :)
-	// if body is map/ if is string then ++ test
-
 	return interaction, nil
 }
 
@@ -133,14 +139,16 @@ func isJSONRequest(request map[string]interface{}) (bool, error) {
 	return mediaType == "application/json", nil
 }
 
-func (i *interaction) addConstraintsFromPact(path string, matchingRules, values map[string]interface{}) {
+// This function adds constraints for all the fields in the JSON request body which do not
+// have a corresponding matching rule
+func (i *interaction) addJSONConstraintsFromPact(path string, matchingRules, values map[string]interface{}) {
 	for k, v := range values {
 		switch val := v.(type) {
 		case map[string]interface{}:
 			if _, exists := val["json_class"]; exists {
 				continue
 			}
-			i.addConstraintsFromPact(path+"."+k, matchingRules, val)
+			i.addJSONConstraintsFromPact(path+"."+k, matchingRules, val)
 		default:
 			p := path + "." + k
 			if _, hasRule := matchingRules[p]; !hasRule {
@@ -154,6 +162,17 @@ func (i *interaction) addConstraintsFromPact(path string, matchingRules, values 
 	}
 }
 
+// This function adds constraints for the entire plain text request body if
+// it doesn't have a corresponding matching rule
+func (i *interaction) addTextConstraintsFromPact(path string, matchingRules interface{}, constraint string) {
+	if _, present := matchingRules.(map[string]interface{})["$.body"]; !present {
+		i.AddConstraint(interactionConstraint{
+			Path:   "$.body",
+			Format: "%v",
+			Values: []interface{}{constraint},
+		})
+	}
+}
 func (i *interaction) Match(path, method string) bool {
 	return method == i.method && i.pathMatcher.match(path)
 }

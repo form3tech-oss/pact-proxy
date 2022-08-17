@@ -149,7 +149,7 @@ func (s *ProxyStage) a_pact_that_allows_any_address() *ProxyStage {
 	return s
 }
 
-func (s *ProxyStage) a_pact_that_expects_plain_text() *ProxyStage {
+func (s *ProxyStage) a_pact_that_expects_plain_text(requestBody string, responseBody string) *ProxyStage {
 	s.pact.
 		AddInteraction().
 		UponReceiving(PostAddressPact).
@@ -157,18 +157,18 @@ func (s *ProxyStage) a_pact_that_expects_plain_text() *ProxyStage {
 			Method:  "POST",
 			Path:    dsl.String("/addresses"),
 			Headers: dsl.MapMatcher{"Content-Type": dsl.String("text/plain")},
-			Body:    "text",
+			Body:    requestBody,
 		}).
 		WillRespondWith(dsl.Response{
 			Status:  200,
 			Headers: dsl.MapMatcher{"Content-Type": dsl.String("text/plain")},
-			Body:    "text",
+			Body:    responseBody,
 		})
 	return s
 
 }
 
-func (s *ProxyStage) a_constaint_is_added(name string) *ProxyStage {
+func (s *ProxyStage) a_constraint_is_added(name string) *ProxyStage {
 	s.constraintValue = name
 	return s
 }
@@ -199,7 +199,7 @@ func (s *ProxyStage) a_request_is_sent_using_the_name(name string) {
 	})
 }
 
-func (s *ProxyStage) a_request_is_sent_in_plain_text() {
+func (s *ProxyStage) a_request_is_sent_in_plain_text(body string) {
 	s.pactResult = s.pact.Verify(func() (err error) {
 		i := s.proxy.
 			ForInteraction(PostAddressPact)
@@ -208,8 +208,12 @@ func (s *ProxyStage) a_request_is_sent_in_plain_text() {
 			i.AddModifier("$.status", fmt.Sprintf("%d", s.modifiedStatusCode), s.modifiedAttempt)
 		}
 
+		if s.constraintValue != "" {
+			i.AddConstraint("$.body", s.constraintValue)
+		}
+
 		u := fmt.Sprintf("http://localhost:%s/addresses", proxyURL.Port())
-		req, err := http.NewRequest("POST", u, strings.NewReader("text"))
+		req, err := http.NewRequest("POST", u, strings.NewReader(body))
 		if err != nil {
 			return err
 		}
@@ -411,7 +415,7 @@ func (s *ProxyStage) the_nth_response_is_(n, statusCode int) *ProxyStage {
 	}
 
 	if s.responses[n-1].StatusCode != statusCode {
-		s.t.Fatalf("Expected status code on attemt %d: %d, got : %d", n, statusCode, s.responses[n-1].StatusCode)
+		s.t.Fatalf("Expected status code on attempt %d: %d, got : %d", n, statusCode, s.responses[n-1].StatusCode)
 	}
 
 	return s
