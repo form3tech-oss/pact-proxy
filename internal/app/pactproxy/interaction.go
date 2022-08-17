@@ -103,6 +103,9 @@ func LoadInteraction(data []byte, alias string) (*interaction, error) {
 		interaction.addConstraintsFromPact("$.body", matchingRules.(map[string]interface{}), requestBody.(map[string]interface{}))
 	}
 
+	// TODO body matching rules also for the text mime type - body is string if its plaintext/string type :)
+	// if body is map/ if is string then ++ test
+
 	return interaction, nil
 }
 

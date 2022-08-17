@@ -20,6 +20,11 @@ const (
 	defaultDuration = 15 * time.Second
 )
 
+var supportedMediaTypes = map[string]func([]byte, *url.URL) (requestDocument, error){
+	"application/json": LoadJSONRequest,
+	"text/plain":       LoadPlainTextRequest,
+}
+
 func StartProxy(server *http.ServeMux, target *url.URL) {
 	api := api{
 		target:       target,
@@ -215,10 +220,8 @@ func (a *api) indexHandler(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	if mediaType != "application/json" {
-		// proxy non-json requests directly
-		// todo refactor to enable response modification
-		a.proxy.ServeHTTP(res, req)
+	if _, ok := supportedMediaTypes[mediaType]; !ok {
+		httpresponse.Error(res, http.StatusUnsupportedMediaType, "unsupported Media Type.")
 		return
 	}
 
@@ -242,7 +245,9 @@ func (a *api) indexHandler(res http.ResponseWriter, req *http.Request) {
 
 	req.Body = ioutil.NopCloser(bytes.NewBuffer(data))
 
-	request, err := LoadRequest(data, req.URL)
+	LoadPlainTextRequest(data, req.URL)
+
+	request, err := LoadJSONRequest(data, req.URL)
 	if err != nil {
 		httpresponse.Errorf(res, http.StatusInternalServerError, "unable to read requestDocument data. %s", err.Error())
 		return

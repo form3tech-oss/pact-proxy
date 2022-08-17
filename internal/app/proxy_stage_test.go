@@ -201,6 +201,13 @@ func (s *ProxyStage) a_request_is_sent_using_the_name(name string) {
 
 func (s *ProxyStage) a_request_is_sent_in_plain_text() {
 	s.pactResult = s.pact.Verify(func() (err error) {
+		i := s.proxy.
+			ForInteraction(PostAddressPact)
+
+		if s.modifiedStatusCode != 0 {
+			i.AddModifier("$.status", fmt.Sprintf("%d", s.modifiedStatusCode), s.modifiedAttempt)
+		}
+
 		u := fmt.Sprintf("http://localhost:%s/addresses", proxyURL.Port())
 		req, err := http.NewRequest("POST", u, strings.NewReader("text"))
 		if err != nil {
@@ -455,7 +462,7 @@ func (s *ProxyStage) the_nth_response_body_is(n int, data []byte) *ProxyStage {
 
 	body := s.responseBodies[n-1]
 	if c := bytes.Compare(body, data); c != 0 {
-		s.t.Fatalf("Expected body did not match. Expected: %s, got: %s", body, data)
+		s.t.Fatalf("Expected body did not match. Expected: %s, got: %s", data, body)
 	}
 
 	return s

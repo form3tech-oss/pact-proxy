@@ -192,3 +192,5 @@ func TestModifiedStatusCodeWithPlainTextBody(t *testing.T) {
 		the_response_body_is([]byte("text")).and().
 		pact_verification_is_successful()
 }
+
+//TODO test also for body matcher :)
