@@ -122,7 +122,7 @@ func parseMediaType(request map[string]interface{}) (string, error) {
 		return "", errors.New("request is missing headers")
 	}
 
-	parsed, ok := headers.(map[string]string)
+	parsed, ok := headers.(map[string]interface{})
 	if !ok {
 		return "", errors.New("incorrect format of request headers")
 	}
@@ -132,7 +132,12 @@ func parseMediaType(request map[string]interface{}) (string, error) {
 		return "", errors.New("Content-Type header is missing in request")
 	}
 
-	mediaType, _, err := mime.ParseMediaType(contentType)
+	contentTypeStr, ok := contentType.(string)
+	if !ok {
+		return "", errors.New("incorrect format of Content-Type header")
+	}
+
+	mediaType, _, err := mime.ParseMediaType(contentTypeStr)
 	if err != nil {
 		return "", err
 	}
