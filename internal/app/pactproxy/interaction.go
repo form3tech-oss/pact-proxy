@@ -111,13 +111,13 @@ func LoadInteraction(data []byte, alias string) (*interaction, error) {
 			interaction.addJSONConstraintsFromPact("$.body", matchingRules.(map[string]interface{}), jsonRequestBody)
 			return interaction, nil
 		}
-		return nil, fmt.Errorf("media type is %s in header but doesn't have json request body", mediaType)
+		return nil, fmt.Errorf("media type is %s but body is not json", mediaType)
 	case "text/plain":
 		if plainTextRequestBody, ok := requestBody.(string); ok {
 			interaction.addTextConstraintsFromPact(matchingRules.(map[string]interface{}), plainTextRequestBody)
 			return interaction, nil
 		}
-		return nil, fmt.Errorf("media type is %s in header  doesn't have plain text request body", mediaType)
+		return nil, fmt.Errorf("media type is %s but body is not text", mediaType)
 	}
 	return interaction, nil
 }
@@ -125,7 +125,8 @@ func LoadInteraction(data []byte, alias string) (*interaction, error) {
 func parseMediaType(request map[string]interface{}) (string, error) {
 	headers, hasHeaders := request["headers"]
 	if !hasHeaders {
-		return "", errors.New("request is missing headers")
+		log.Info("Header not found. Assuming content type to be JSON")
+		return "application/json", nil
 	}
 
 	parsed, ok := headers.(map[string]interface{})
@@ -142,7 +143,10 @@ func parseMediaType(request map[string]interface{}) (string, error) {
 	if !ok {
 		return "", errors.New("incorrect format of Content-Type header")
 	}
-
+	if contentTypeStr == "" {
+		log.Info("Content type not found. Assuming it to be JSON")
+		return "application/json", nil
+	}
 	mediaType, _, err := mime.ParseMediaType(contentTypeStr)
 	if err != nil {
 		return "", err

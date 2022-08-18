@@ -213,13 +213,18 @@ func (a *api) interactionsWaitHandler(res http.ResponseWriter, req *http.Request
 
 func (a *api) indexHandler(res http.ResponseWriter, req *http.Request) {
 	log.Infof("proxying %s", req.URL.Path)
-
-	mediaType, _, err := mime.ParseMediaType(req.Header.Get("Content-Type"))
-	if err != nil {
-		log.Info("unable to find media type. Defaulting to JSON")
+	var mediaType string
+	var err error
+	if req.Header.Get("Content-Type") == "" {
+		log.Infof("unable to find media type. Defaulting to JSON")
 		mediaType = "application/json"
+	} else {
+		mediaType, _, err = mime.ParseMediaType(req.Header.Get("Content-Type"))
+		if err != nil {
+			httpresponse.Errorf(res, http.StatusBadRequest, "failed to parse Content-Type. %s", err.Error())
+			return
+		}
 	}
-
 	parseRequest, ok := supportedMediaTypes[mediaType]
 	if !ok {
 		httpresponse.Errorf(res, http.StatusUnsupportedMediaType, "unsupported Media Type: %s", mediaType)
