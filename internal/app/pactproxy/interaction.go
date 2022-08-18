@@ -112,8 +112,8 @@ func LoadInteraction(data []byte, alias string) (*interaction, error) {
 		}
 		return nil, fmt.Errorf("media type is %s in header but doesn't have json request body", mediaType)
 	case "text/plain":
-		if _, ok := requestBody.(string); ok {
-			//interaction.addTextConstraintsFromPact(matchingRules.(map[string]interface{}), plainTextRequestBody)
+		if plainTextRequestBody, ok := requestBody.(string); ok {
+			interaction.addTextConstraintsFromPact(matchingRules.(map[string]interface{}), plainTextRequestBody)
 			return interaction, nil
 		}
 		return nil, fmt.Errorf("media type is %s in header  doesn't have plain text request body", mediaType)

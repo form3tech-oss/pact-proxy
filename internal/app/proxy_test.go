@@ -224,8 +224,8 @@ func TestPlainTextDefaultConstraintAdded(t *testing.T) {
 		a_request_is_sent_in_plain_text_with_body("request with doesn't match constraint")
 
 	then.
-		the_response_is_(http.StatusOK).and().
-		pact_verification_is_successful()
+		the_response_is_(http.StatusBadRequest).and().
+		pact_verification_is_not_successful()
 }
 
 func TestPlainTextConstraintDoesNotMatch(t *testing.T) {
