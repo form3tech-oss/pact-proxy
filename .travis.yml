@@ -13,7 +13,9 @@ services:
 install:
   - if [[ -a .git/shallow ]]; then git fetch --unshallow --tags; fi
 
-deploy:
-  - provider: script
-    skip_cleanup: true
-    script: make publish
+jobs:
+  include:
+    - stage: publish
+      name: publish images
+      script:
+        - make publish
