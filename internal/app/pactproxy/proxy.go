@@ -216,8 +216,8 @@ func (a *api) indexHandler(res http.ResponseWriter, req *http.Request) {
 
 	mediaType, _, err := mime.ParseMediaType(req.Header.Get("Content-Type"))
 	if err != nil {
-		httpresponse.Errorf(res, http.StatusBadRequest, "failed to parse Content-Type. %s", err.Error())
-		return
+		log.Info("unable to find media type. Defaulting to JSON")
+		mediaType = "application/json"
 	}
 
 	parseRequest, ok := supportedMediaTypes[mediaType]

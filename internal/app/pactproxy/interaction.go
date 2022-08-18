@@ -101,7 +101,8 @@ func LoadInteraction(data []byte, alias string) (*interaction, error) {
 
 	mediaType, err := parseMediaType(request)
 	if err != nil {
-		return nil, errors.Wrap(err, "unable to parse media type")
+		log.Info("Content type not found. Assuming it to be JSON")
+		mediaType = "application/json"
 	}
 
 	switch mediaType {
@@ -117,10 +118,8 @@ func LoadInteraction(data []byte, alias string) (*interaction, error) {
 			return interaction, nil
 		}
 		return nil, fmt.Errorf("media type is %s in header  doesn't have plain text request body", mediaType)
-	default:
-		return nil, errors.New("unsupported media type " + mediaType)
 	}
-	//return interaction, nil
+	return interaction, nil
 }
 
 func parseMediaType(request map[string]interface{}) (string, error) {

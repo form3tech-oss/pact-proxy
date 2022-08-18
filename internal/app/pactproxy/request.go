@@ -2,9 +2,10 @@ package pactproxy
 
 import (
 	"encoding/json"
-	"github.com/pkg/errors"
 	"net/url"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 type requestDocument map[string]interface{}
@@ -36,13 +37,14 @@ func ParsePlainTextRequest(data []byte, url *url.URL) (requestDocument, error) {
 	}, nil
 }
 
-func parseQueryValues(url *url.URL) (queryValues map[string]interface{}) {
+func parseQueryValues(url *url.URL) map[string]interface{} {
+	queryValues := make(map[string]interface{})
 	for q, v := range url.Query() {
 		if len(v) > 0 {
 			escapeValue(queryValues, q, v[0])
 		}
 	}
-	return
+	return queryValues
 }
 
 func (r requestDocument) encodeValues(val string) string {
