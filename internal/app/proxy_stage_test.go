@@ -149,7 +149,11 @@ func (s *ProxyStage) a_pact_that_allows_any_address() *ProxyStage {
 	return s
 }
 
-func (s *ProxyStage) a_pact_that_expects_plain_text(requestBody string, responseBody string) *ProxyStage {
+func (s *ProxyStage) a_pact_that_expects_plain_text() *ProxyStage {
+	return s.a_pact_that_expects_plain_text_with_request_response("text", "text")
+}
+
+func (s *ProxyStage) a_pact_that_expects_plain_text_with_request_response(reqBody string, respBody string) *ProxyStage {
 	s.pact.
 		AddInteraction().
 		UponReceiving(PostAddressPact).
@@ -157,15 +161,14 @@ func (s *ProxyStage) a_pact_that_expects_plain_text(requestBody string, response
 			Method:  "POST",
 			Path:    dsl.String("/addresses"),
 			Headers: dsl.MapMatcher{"Content-Type": dsl.String("text/plain")},
-			Body:    requestBody,
+			Body:    reqBody,
 		}).
 		WillRespondWith(dsl.Response{
 			Status:  200,
 			Headers: dsl.MapMatcher{"Content-Type": dsl.String("text/plain")},
-			Body:    responseBody,
+			Body:    respBody,
 		})
 	return s
-
 }
 
 func (s *ProxyStage) a_constraint_is_added(name string) *ProxyStage {
@@ -199,7 +202,15 @@ func (s *ProxyStage) a_request_is_sent_using_the_name(name string) {
 	})
 }
 
-func (s *ProxyStage) a_request_is_sent_in_plain_text(body string) {
+func (s *ProxyStage) a_request_is_sent_in_plain_text() {
+	s.a_request_is_sent_in_plain_text_with_body("text")
+}
+
+func (s *ProxyStage) a_request_is_sent_in_plain_text_with_body(body string) {
+	s.a_request_is_sent_with_body_and_content_type(body, "text/plain")
+}
+
+func (s *ProxyStage) a_request_is_sent_with_body_and_content_type(body, contentType string) {
 	s.pactResult = s.pact.Verify(func() (err error) {
 		i := s.proxy.
 			ForInteraction(PostAddressPact)
@@ -218,7 +229,9 @@ func (s *ProxyStage) a_request_is_sent_in_plain_text(body string) {
 			return err
 		}
 
-		req.Header.Set("Content-Type", "text/plain")
+		if contentType != "" {
+			req.Header.Set("Content-Type", contentType)
+		}
 
 		res, err := http.DefaultClient.Do(req)
 		if err != nil {
@@ -457,6 +470,10 @@ func (s *ProxyStage) the_nth_response_body_has_(n int, key, value string) *Proxy
 
 func (s *ProxyStage) the_response_body_is(data []byte) *ProxyStage {
 	return s.the_nth_response_body_is(1, data)
+}
+
+func (s *ProxyStage) the_response_body_to_plain_text_request_is_correct() *ProxyStage {
+	return s.the_nth_response_body_is(1, []byte("text"))
 }
 
 func (s *ProxyStage) the_nth_response_body_is(n int, data []byte) *ProxyStage {

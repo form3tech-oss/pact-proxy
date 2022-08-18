@@ -21,8 +21,8 @@ const (
 )
 
 var supportedMediaTypes = map[string]func([]byte, *url.URL) (requestDocument, error){
-	"application/json": LoadJSONRequest,
-	"text/plain":       LoadPlainTextRequest,
+	"application/json": ParseJSONRequest,
+	"text/plain":       ParsePlainTextRequest,
 }
 
 func StartProxy(server *http.ServeMux, target *url.URL) {
@@ -216,12 +216,13 @@ func (a *api) indexHandler(res http.ResponseWriter, req *http.Request) {
 
 	mediaType, _, err := mime.ParseMediaType(req.Header.Get("Content-Type"))
 	if err != nil {
-		httpresponse.Errorf(res, http.StatusBadRequest, "bad Content-Type. %s", err.Error())
+		httpresponse.Errorf(res, http.StatusBadRequest, "failed to parse Content-Type. %s", err.Error())
 		return
 	}
 
-	if _, ok := supportedMediaTypes[mediaType]; !ok {
-		httpresponse.Error(res, http.StatusUnsupportedMediaType, "unsupported Media Type.")
+	parseRequest, ok := supportedMediaTypes[mediaType]
+	if !ok {
+		httpresponse.Errorf(res, http.StatusUnsupportedMediaType, "unsupported Media Type: %s", mediaType)
 		return
 	}
 
@@ -245,7 +246,7 @@ func (a *api) indexHandler(res http.ResponseWriter, req *http.Request) {
 
 	req.Body = ioutil.NopCloser(bytes.NewBuffer(data))
 
-	request, err := supportedMediaTypes[mediaType](data, req.URL)
+	request, err := parseRequest(data, req.URL)
 	if err != nil {
 		httpresponse.Errorf(res, http.StatusInternalServerError, "unable to read requestDocument data. %s", err.Error())
 		return

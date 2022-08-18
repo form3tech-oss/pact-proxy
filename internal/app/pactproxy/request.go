@@ -9,7 +9,7 @@ import (
 
 type requestDocument map[string]interface{}
 
-func LoadJSONRequest(data []byte, url *url.URL) (requestDocument, error) {
+func ParseJSONRequest(data []byte, url *url.URL) (requestDocument, error) {
 	body := make(map[string]interface{})
 	if len(data) > 0 {
 		err := json.Unmarshal(data, &body)
@@ -26,7 +26,7 @@ func LoadJSONRequest(data []byte, url *url.URL) (requestDocument, error) {
 	}, nil
 }
 
-func LoadPlainTextRequest(data []byte, url *url.URL) (requestDocument, error) {
+func ParsePlainTextRequest(data []byte, url *url.URL) (requestDocument, error) {
 	queryValues := parseQueryValues(url)
 
 	return map[string]interface{}{
