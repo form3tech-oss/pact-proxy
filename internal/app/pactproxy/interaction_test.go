@@ -1,13 +1,13 @@
 package pactproxy
 
 import (
-	"fmt"
-	"reflect"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"testing"
 )
 
-func TestLoadInteractionTextConstraints(t *testing.T) {
-	matchersNotPresentJSON := `{
+func TestLoadInteractionPlainTextConstraints(t *testing.T) {
+	matchersNotPresent := `{
 		"description": "A request to create an address",
 		"request": {
 		  "method": "POST",
@@ -25,66 +25,61 @@ func TestLoadInteractionTextConstraints(t *testing.T) {
 		  "body": "some file response"
 		}
 	  }`
-
-	matchersPresentJSON := `{
-		"description": "Create report successfully",
-		"providerState": [
-		  {
-			"name": "User has permission to create report",
-			"params": {
-			  "read": "reports",
-			  "create_approve": "reports",
-			  "organisation_id": "743d5b63-8e6f-432e-a8fa-c5d8d2ee5fcb",
-			  "user_id": "b684c0b7-3375-4165-872b-19e9c21b903c"
-			}
-		  }
-		],
+	matcherPresent :=
+		`{
+		"description": "A request to create an address",
 		"request": {
 		  "method": "POST",
-		  "path": "/v1/reports",
+		  "path": "/addresses",
 		  "headers": {
-			"Accept": "application/json; charset=utf-8",
-			"Content-Type": "application/json; charset=utf-8",
-			"X-Consumer-Custom-Id": "772ba46b-3053-49bf-9444-6c0784af1846"
+			"Content-Type": "text/plain"
 		  },
-		  "body": "some random file content",
+		  "body": "some file request",
 		  "matchingRules": {
-			"$.headers.Content-Type": {
-			  "regex": "application\/json"
-			},
 			"$.body": {
-			  "match": "type"
+			  "regex": "type"
 			}}
 		},
 		"response": {
-		  "status": 201,
+		  "status": 200,
 		  "headers": {
-			"Content-Type": "application/json; charset=utf-8"
+			"Content-Type": "text/plain"
 		  },
-		  "body": {
-			"data": {
-			  "version": 0
-			}
-		  }
+		  "body": "some file response"
 		}
-	  }
-	`
-	type args struct {
-		data  []byte
-		alias string
-	}
+	  }`
+	invalidBodyPathMatcherPresent :=
+		`{
+		"description": "A request to create an address",
+		"request": {
+		  "method": "POST",
+		  "path": "/addresses",
+		  "headers": {
+			"Content-Type": "text/plain"
+		  },
+		  "body": "some file request",
+		  "matchingRules": {
+			"$.body.invalid.path": {
+			  "regex": "type"
+			}}
+		},
+		"response": {
+		  "status": 200,
+		  "headers": {
+			"Content-Type": "text/plain"
+		  },
+		  "body": "some file response"
+		}
+	  }`
 	tests := []struct {
 		name           string
-		args           args
+		interaction    []byte
 		wantConstraint interactionConstraint
 		wantErr        bool
 	}{
 		{
-			name: "matchers not present in pact JSON",
-			args: args{
-				data:  []byte(matchersNotPresentJSON),
-				alias: "matchers not present",
-			},
+			name:        "matcher not present - interaction is created",
+			interaction: []byte(matchersNotPresent),
 			wantConstraint: interactionConstraint{
 				Path:   "$.body",
 				Format: "%v",
@@ -92,31 +87,34 @@ func TestLoadInteractionTextConstraints(t *testing.T) {
 			},
 		},
 		{
-			name: "matchers present in pact JSON",
-			args: args{
-				data:  []byte(matchersPresentJSON),
-				alias: "matchers not present",
+			name:        "matcher with invalid path present - interaction is created",
+			interaction: []byte(invalidBodyPathMatcherPresent),
+			wantConstraint: interactionConstraint{
+				Path:   "$.body",
+				Format: "%v",
+				Values: []interface{}{"some file request"},
 			},
+		},
+		{
+			name:           "matcher present - no interaction created",
+			interaction:    []byte(matcherPresent),
 			wantConstraint: interactionConstraint{},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := LoadInteraction(tt.args.data, tt.args.alias)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("LoadInteraction() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
+			got, err := LoadInteraction(tt.interaction, "alias")
+
+			require.Equalf(t, tt.wantErr, err != nil, "error %v", err)
+
 			var gotConstraint interactionConstraint
-			var present bool
 			got.constraints.Range(func(key, value interface{}) bool {
-				fmt.Printf("key %v value %v\n", key, value)
+				var present bool
 				gotConstraint, present = value.(interactionConstraint)
 				return present
 			})
-			if !reflect.DeepEqual(gotConstraint, tt.wantConstraint) {
-				t.Errorf("LoadInteraction() = %v, want %v", got, tt.wantConstraint)
-			}
+
+			assert.EqualValues(t, tt.wantConstraint, gotConstraint)
 		})
 	}
 }
