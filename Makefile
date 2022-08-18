@@ -47,8 +47,10 @@ install-pact:
 .PHONY: publish
 publish:
 	@echo "==> Building docker image..."
-	docker build --build-arg APPNAME=pact-proxy -f build/package/pact-proxy/Dockerfile -t $(DOCKER_IMG):swift-gateway-changes .
+	docker build --build-arg APPNAME=pact-proxy -f build/package/pact-proxy/Dockerfile -t $(DOCKER_IMG):$(TRAVIS_TAG) .
 	@echo "==> Logging in to the docker registry..."
 	echo "$(DOCKER_PASSWORD)" | docker login -u "$(DOCKER_USERNAME)" --password-stdin
 	@echo "==> Pushing built image..."
-	docker push $(DOCKER_IMG):swift-gateway-changes
+	docker push $(DOCKER_IMG):$(TRAVIS_TAG)
+	docker tag $(DOCKER_IMG):$(TRAVIS_TAG) $(DOCKER_IMG):latest
+	docker push $(DOCKER_IMG):latest

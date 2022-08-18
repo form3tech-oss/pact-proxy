@@ -12,10 +12,15 @@ services:
   - docker
 install:
   - if [[ -a .git/shallow ]]; then git fetch --unshallow --tags; fi
-
 jobs:
   include:
-    - stage: publish
-      name: publish images
+    - stage: test
+      name: Go Test
       script:
-        - make publish
+        - make test
+deploy:
+  - provider: script
+    skip_cleanup: true
+    script: make publish
+    on:
+      tags: true
