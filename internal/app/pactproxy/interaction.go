@@ -106,14 +106,21 @@ func LoadInteraction(data []byte, alias string) (*interaction, error) {
 
 	switch mediaType {
 	case "application/json":
-		interaction.addJSONConstraintsFromPact("$.body", matchingRules.(map[string]interface{}), requestBody.(map[string]interface{}))
+		if jsonRequestBody, ok := requestBody.(map[string]interface{}); ok {
+			interaction.addJSONConstraintsFromPact("$.body", matchingRules.(map[string]interface{}), jsonRequestBody)
+			return interaction, nil
+		}
+		return nil, fmt.Errorf("media type is %s in header but doesn't have json request body", mediaType)
 	case "text/plain":
-		interaction.addTextConstraintsFromPact(matchingRules.(map[string]interface{}), requestBody.(string))
+		if _, ok := requestBody.(string); ok {
+			//interaction.addTextConstraintsFromPact(matchingRules.(map[string]interface{}), plainTextRequestBody)
+			return interaction, nil
+		}
+		return nil, fmt.Errorf("media type is %s in header  doesn't have plain text request body", mediaType)
 	default:
 		return nil, errors.New("unsupported media type " + mediaType)
 	}
-
-	return interaction, nil
+	//return interaction, nil
 }
 
 func parseMediaType(request map[string]interface{}) (string, error) {

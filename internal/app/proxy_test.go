@@ -210,6 +210,24 @@ func TestPlainTextConstraintMatches(t *testing.T) {
 		pact_verification_is_successful()
 }
 
+func TestPlainTextDefaultConstraintAdded(t *testing.T) {
+	given, when, then, teardown := NewProxyStage(t)
+	defer teardown()
+
+	requestBody := "request body"
+	responseBody := "response body"
+
+	given.
+		a_pact_that_expects_plain_text_with_request_response(requestBody, responseBody)
+
+	when.
+		a_request_is_sent_in_plain_text_with_body("request with doesn't match constraint")
+
+	then.
+		the_response_is_(http.StatusOK).and().
+		pact_verification_is_successful()
+}
+
 func TestPlainTextConstraintDoesNotMatch(t *testing.T) {
 	given, when, then, teardown := NewProxyStage(t)
 	defer teardown()
