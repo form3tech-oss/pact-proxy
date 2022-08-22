@@ -83,7 +83,7 @@ func (s *ProxyStage) a_pact_that_allows_any_names() *ProxyStage {
 			Method:  "POST",
 			Path:    dsl.String("/users"),
 			Headers: dsl.MapMatcher{"Content-Type": dsl.String("application/json")},
-			Body:    dsl.MapMatcher{"name": dsl.Regex("any", ".*")},
+			Body:    dsl.MapMatcher{"body": dsl.Regex("any", ".*")},
 		}).
 		WillRespondWith(dsl.Response{
 			Status:  200,
@@ -179,9 +179,155 @@ func (s *ProxyStage) a_constraint_is_added(name string) *ProxyStage {
 func (s *ProxyStage) a_request_is_sent_using_the_name(name string) {
 	s.pactResult = s.pact.Verify(func() (err error) {
 		s.proxy.ForInteraction(PostNamePact).AddConstraint("$.body.name", s.constraintValue)
-
+		fmt.Println("proxy url port is ", proxyURL.Port())
 		u := fmt.Sprintf("http://localhost:%s/users", proxyURL.Port())
-		req, err := http.NewRequest("POST", u, strings.NewReader(fmt.Sprintf(`{"name":"%s"}`, name)))
+		//req, err := http.NewRequest("POST", u, strings.NewReader(fmt.Sprintf(`{"name":"%s"}`, name)))
+		req, err := http.NewRequest("POST", u, strings.NewReader(`{
+			"amount": "13.00",
+			"beneficiary_party": {
+			  "account_name": "beneficiaryName",
+			  "account_number": "beneficiaryIBAN",
+			  "account_number_code": "IBAN",
+			  "account_with": {
+				"bank_address": [
+				  "1, Rue de Banque",
+				  "Paris"
+				],
+				"bank_id": "beneficiaryBankID",
+				"bank_id_code": "beneficiaryBankIDCode",
+				"bank_name": "Banque Argent"
+			  },
+			  "address": [
+				"1, Rue de Beneficiary",
+				"Paris",
+				"FR/Paris"
+			  ],
+			  "birth_city": "Budapest",
+			  "birth_country": "Hungary",
+			  "birth_date": "1988-02-20",
+			  "birth_province": "Pest",
+			  "city": "Brno",
+			  "country": "CZ",
+			  "name": "beneficiaryName",
+			  "organisation_identification": "beneficiaryOrgID",
+			  "organisation_identification_code": "Other",
+			  "organisation_identification_issuer": "beneficiaryOrgIssuer",
+			  "organisation_identification_scheme": "beneficiaryOrgScheme",
+			  "private_identification": {
+				"identification": "beneficiaryPrivateID",
+				"identification_issuer": "beneficiaryPrivateIssuer",
+				"identification_scheme": "beneficiaryPrivateSchemeName",
+				"identification_scheme_code": "beneficiaryPrivateSchemeCode"
+			  }
+			},
+			"category_purpose": "categoryPurp",
+			"category_purpose_coded": "categoryPurpCode",
+			"charges_information": {
+			  "bearer_code": "CRED",
+			  "sender_charges": [
+				{
+				  "amount": "123",
+				  "currency": "EUR"
+				}
+			  ]
+			},
+			"currency": "EUR",
+			"debtor_party": {
+			  "account_name": "Mr Joe Sender",
+			  "account_number": "GB06NWBK44444412121212",
+			  "account_number_code": "IBAN",
+			  "account_with": {
+				"bank_address": [
+				  "2 Bank Street",
+				  "London"
+				],
+				"bank_id": "NWBKGB22",
+				"bank_id_code": "SWBIC",
+				"bank_name": "debtor party bank name"
+			  },
+			  "address": [
+				"1, Joes Avenue",
+				"London",
+				"GB/London"
+			  ],
+			  "birth_city": "debtorBirthCity",
+			  "birth_country": "debtorBirthCountry",
+			  "birth_date": "2018-05-01",
+			  "birth_province": "debtorBirthProvince",
+			  "city": "debtorTown",
+			  "country": "debtorCountry",
+			  "name": "Mr Joe Sender",
+			  "organisation_identification": "debtorBIC",
+			  "organisation_identification_code": "BIC",
+			  "private_identification": {
+				"identification": "debtorPrivateID",
+				"identification_issuer": "debtorPrivateIDIssuer",
+				"identification_scheme_code": "debtorPrivateIDSchemeCode"
+			  }
+			},
+			"end_to_end_reference": "End2End",
+			"fx": {
+			  "exchange_rate": "2.001",
+			  "original_amount": "16.00",
+			  "original_currency": "GBP"
+			},
+			"instruction_id": "REF987",
+			"payment_purpose": "paymentPurpose",
+			"payment_purpose_coded": "paymentPurposeCode",
+			"payment_scheme": "SWIFT",
+			"processing_date": "2018-04-01",
+			"reference": "2a9b57cc-309e-49a4-a412-859e92d09db3",
+			"remittance_information": "remittanceInfo",
+			"scheme_payment_sub_type": "subtype",
+			"scheme_payment_type": "CustomerCreditTransfer",
+			"scheme_transaction_id": "1234",
+			"settlement": {
+			  "account_number": "GB06NWBK44444456565656",
+			  "account_number_code": "IBAN",
+			  "method": "INGA"
+			},
+			"structured_reference": {
+			  "issuer": "structuredReferenceIssuer",
+			  "reference": "structuredReference"
+			},
+			"ultimate_beneficiary": {
+			  "birth_city": "ultBeneficiaryPrivateCity",
+			  "birth_country": "ultBeneficiaryPrivateCountry",
+			  "birth_date": "2019-05-11",
+			  "birth_province": "ultBeneficiaryPrivateProvince",
+			  "country": "ultBeneficiaryCountry",
+			  "name": "ultBeneficiaryName",
+			  "organisation_identification": "ultBeneficiaryOrgID",
+			  "organisation_identification_code": "Other",
+			  "organisation_identification_issuer": "ultBeneficiaryOrgIDIssuer",
+			  "organisation_identification_scheme": "ultBeneficiaryOrgSchemeCd",
+			  "private_identification": {
+				"identification": "ultBeneficiaryPrivateID",
+				"identification_issuer": "ultBeneficiaryPrivateIssuer",
+				"identification_scheme": "ultBeneficiaryPrivateScheme",
+				"identification_scheme_code": "ultBeneficiaryPrivateSchemeCD"
+			  }
+			},
+			"ultimate_debtor": {
+			  "birth_city": "ultimateDebtorPrivateCity",
+			  "birth_country": "ultimateDebtorPrivateCountry",
+			  "birth_date": "2020-05-11",
+			  "birth_province": "ultimateDebtorPrivateProvince",
+			  "city": "ultDebtorCity",
+			  "country": "ultDebtorCountry",
+			  "name": "ultDebtorName",
+			  "organisation_identification": "ultimateDebtorBIC",
+			  "organisation_identification_code": "BIC",
+			  "organisation_identification_scheme": "ultimateDebtorScheme",
+			  "private_identification": {
+				"identification": "ultimateDebtorPrivateID",
+				"identification_issuer": "ultimateDebtorPrivateIssuer",
+				"identification_scheme": "ultimateDebtorPrivateScheme",
+				"identification_scheme_code": "ultimateDebtorPrivateSchemeCD"
+			  }
+			},
+			"unique_scheme_id": "schemeID"
+		  }`))
 		if err != nil {
 			return err
 		}
