@@ -15,6 +15,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+const mediaTypeJSON = "application/json"
+
 type pathMatcher interface {
 	match(val string) bool
 }
@@ -101,8 +103,7 @@ func LoadInteraction(data []byte, alias string) (*interaction, error) {
 
 	mediaType, err := parseMediaType(request)
 	if err != nil {
-		log.Info("Content type not found. Assuming it to be JSON")
-		mediaType = "application/json"
+		return nil, errors.Wrap(err, "unable to parse media type")
 	}
 
 	switch mediaType {
@@ -125,8 +126,8 @@ func LoadInteraction(data []byte, alias string) (*interaction, error) {
 func parseMediaType(request map[string]interface{}) (string, error) {
 	headers, hasHeaders := request["headers"]
 	if !hasHeaders {
-		log.Info("Header not found. Assuming content type to be JSON")
-		return "application/json", nil
+		log.Info("Request has no headers defined - defaulting media type to application/json")
+		return mediaTypeJSON, nil
 	}
 
 	parsed, ok := headers.(map[string]interface{})
@@ -136,17 +137,15 @@ func parseMediaType(request map[string]interface{}) (string, error) {
 
 	contentType, ok := parsed["Content-Type"]
 	if !ok {
-		return "", errors.New("Content-Type header is missing in request")
+		log.Info("Request has no Content-Type header defined - defaulting media type to application/json")
+		return mediaTypeJSON, nil
 	}
 
 	contentTypeStr, ok := contentType.(string)
 	if !ok {
 		return "", errors.New("incorrect format of Content-Type header")
 	}
-	if contentTypeStr == "" {
-		log.Info("Content type not found. Assuming it to be JSON")
-		return "application/json", nil
-	}
+
 	mediaType, _, err := mime.ParseMediaType(contentTypeStr)
 	if err != nil {
 		return "", err
