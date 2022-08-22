@@ -143,17 +143,17 @@ func Test_parseMediaType(t *testing.T) {
 			want: "application/json",
 		},
 		{
-			name:    "request headers definition missing - default to JSON",
+			name:    "request headers definition missing - default to text",
 			request: map[string]interface{}{},
-			want:    "application/json",
+			want:    "text/plain",
 		},
 		{
-			name: "request Content-Type header missing - default to JSON",
+			name: "request Content-Type header missing - default to text",
 			request: map[string]interface{}{
 				"headers": map[string]interface{}{
 					"other header": "stuff",
 				}},
-			want: "application/json",
+			want: "text/plain",
 		},
 		{
 			name: "invalid media type",
