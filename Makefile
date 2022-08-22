@@ -41,7 +41,6 @@ vendor:
 install-pact:
 	@if [ ! -d ./pact ]; then \
         echo "pact not installed, installing..."; \
-		echo "$(PACT_VERSION)"; \
         wget --quiet https://github.com/pact-foundation/pact-ruby-standalone/releases/download/v${PACT_VERSION}/${PACT_FILE} -O /tmp/pactserver.tar.gz && tar -xzf /tmp/pactserver.tar.gz 2>/dev/null -C .; \
     fi
 
