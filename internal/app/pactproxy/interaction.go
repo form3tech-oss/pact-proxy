@@ -123,7 +123,7 @@ func LoadInteraction(data []byte, alias string) (*interaction, error) {
 		}
 		return nil, fmt.Errorf("media type is %s but body is not text", mediaType)
 	}
-	return interaction, nil
+	return nil, fmt.Errorf("unsupported media type %s", mediaType)
 }
 
 func parseMediaType(request map[string]interface{}) (string, error) {
