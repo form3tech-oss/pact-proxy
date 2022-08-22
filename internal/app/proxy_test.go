@@ -19,6 +19,34 @@ func TestLargePactResponse(t *testing.T) {
 		the_nth_response_body_has_(1, "generated", largeString)
 }
 
+func TestLargePactResponseWithModifiedBody(t *testing.T) {
+	given, when, then, teardown := NewProxyStage(t)
+	defer teardown()
+
+	given.a_pact_for_large_string_generation().and().
+		a_modified_response_body_of_("$.body.name", "jane")
+
+	when.
+		n_requests_are_sent_with_modifiers_using_the_body(postLargeStringPact, 1, `{"string":"large"}`)
+
+	then.
+		pact_verification_is_successful().and().
+		the_response_name_is_("jane").and()
+}
+
+func TestLargePactResponseWithModifiedStatusCode(t *testing.T) {
+	given, when, then, teardown := NewProxyStage(t)
+	defer teardown()
+
+	given.a_pact_for_large_string_generation().and().
+		a_modified_response_status_of_(http.StatusInternalServerError)
+
+	when.n_requests_are_sent_with_modifiers_using_the_body(postLargeStringPact, 1, `{"string":"large"}`)
+
+	then.the_response_is_(http.StatusInternalServerError).and().
+		pact_verification_is_successful()
+}
+
 func TestConstraintMatches(t *testing.T) {
 	given, when, then, teardown := NewProxyStage(t)
 	defer teardown()
@@ -79,7 +107,7 @@ func TestModifiedStatusCode(t *testing.T) {
 		a_pact_that_allows_any_names().and().
 		a_modified_response_status_of_(http.StatusInternalServerError)
 
-	when.a_request_is_sent_with_modifiers_using_the_name("sam")
+	when.a_request_is_sent_with_modifiers_using_the_name(postNamePact, "sam")
 
 	then.the_response_is_(http.StatusInternalServerError).and().
 		pact_verification_is_successful()
@@ -93,7 +121,7 @@ func TestModifiedStatusCodeOnARequestWithoutBody(t *testing.T) {
 		a_pact_that_returns_no_body().and().
 		a_modified_response_status_of_(http.StatusInternalServerError)
 
-	when.a_request_is_sent_with_modifiers_using_the_name("sam")
+	when.a_request_is_sent_with_modifiers_using_the_name(postNamePact, "sam")
 
 	then.the_response_is_(http.StatusInternalServerError).and().
 		pact_verification_is_successful()
@@ -107,7 +135,7 @@ func TestModifiedBody(t *testing.T) {
 		a_pact_that_allows_any_names().and().
 		a_modified_response_body_of_("$.body.name", "jane")
 
-	when.a_request_is_sent_with_modifiers_using_the_name("sam")
+	when.a_request_is_sent_with_modifiers_using_the_name(postNamePact, "sam")
 
 	then.the_response_name_is_("jane").and().
 		pact_verification_is_successful()
@@ -122,7 +150,7 @@ func TestModifiedStatusCode_ForNRequests(t *testing.T) {
 		a_modified_response_status_of_(http.StatusInternalServerError).and().
 		a_modified_response_attempt_of(2)
 
-	when.n_requests_are_sent_with_modifiers_using_the_name(3, "sam")
+	when.n_requests_are_sent_with_modifiers_using_the_name(postNamePact, 3, "sam")
 
 	then.
 		n_responses_were_received(3).and().
@@ -141,7 +169,7 @@ func TestModifiedBody_ForNRequests(t *testing.T) {
 		a_modified_response_body_of_("$.body.name", "jim").and().
 		a_modified_response_attempt_of(2)
 
-	when.n_requests_are_sent_with_modifiers_using_the_name(3, "sam")
+	when.n_requests_are_sent_with_modifiers_using_the_name(postNamePact, 3, "sam")
 
 	then.
 		n_responses_were_received(3).and().
@@ -161,7 +189,7 @@ func TestModifiedBodyWithFirstAndLastName_ForNRequests(t *testing.T) {
 		a_modified_response_body_of_("$.body.last_name", "gud").and().
 		a_modified_response_attempt_of(2)
 
-	when.n_requests_are_sent_with_modifiers_using_the_body(3, `{"first_name":"sam","last_name":"brown"}`)
+	when.n_requests_are_sent_with_modifiers_using_the_body(postNamePact, 3, `{"first_name":"sam","last_name":"brown"}`)
 
 	then.
 		n_responses_were_received(3).and().
@@ -182,7 +210,7 @@ func TestTextPlainContentType(t *testing.T) {
 		a_pact_that_expects_plain_text()
 
 	when.
-		a_request_is_sent_in_plain_text()
+		a_request_is_sent_in_plain_text(postAddressPact)
 
 	then.
 		the_response_is_(http.StatusOK).and().
@@ -199,7 +227,7 @@ func TestModifiedStatusCodeWithPlainTextBody(t *testing.T) {
 		a_modified_response_status_of_(http.StatusInternalServerError)
 
 	when.
-		a_request_is_sent_in_plain_text()
+		a_request_is_sent_in_plain_text(postAddressPact)
 
 	then.
 		the_response_is_(http.StatusInternalServerError).and().
@@ -216,7 +244,7 @@ func TestPlainTextConstraintMatches(t *testing.T) {
 
 	when.
 		a_constraint_is_added("text").and().
-		a_request_is_sent_in_plain_text()
+		a_request_is_sent_in_plain_text(postAddressPact)
 
 	then.
 		the_response_is_(http.StatusOK).and().
@@ -235,7 +263,7 @@ func TestPlainTextDefaultConstraintAdded(t *testing.T) {
 		a_pact_that_expects_plain_text_with_request_response(requestBody, responseBody)
 
 	when.
-		a_request_is_sent_in_plain_text_with_body("request with doesn't match constraint")
+		a_request_is_sent_in_plain_text_with_body(postAddressPact, "request with doesn't match constraint")
 
 	then.
 		the_response_is_(http.StatusBadRequest).and().
@@ -251,7 +279,7 @@ func TestPlainTextConstraintDoesNotMatch(t *testing.T) {
 
 	when.
 		a_constraint_is_added("incorrect file content").and().
-		a_request_is_sent_in_plain_text()
+		a_request_is_sent_in_plain_text(postAddressPact)
 
 	then.
 		the_response_is_(http.StatusBadRequest).and().
@@ -271,7 +299,7 @@ func TestPlainTextDifferentRequestAndResponseBodies(t *testing.T) {
 
 	when.
 		a_constraint_is_added(requestConstraint).and().
-		a_request_is_sent_in_plain_text_with_body(requestBody)
+		a_request_is_sent_in_plain_text_with_body(postAddressPact, requestBody)
 
 	then.
 		the_response_is_(http.StatusOK).and().
@@ -292,7 +320,7 @@ func TestIncorrectContentTypes(t *testing.T) {
 				a_pact_that_expects_plain_text()
 
 			when.
-				a_request_is_sent_with_body_and_content_type("req body", contentType)
+				a_request_is_sent_with_body_and_content_type(postAddressPact, "req body", contentType)
 
 			then.
 				the_response_is_(wantResponse).and().
@@ -309,7 +337,7 @@ func TestEmptyContentTypeDefaultsToPlainText(t *testing.T) {
 		a_pact_that_expects_plain_text_without_request_content_type_header()
 
 	when.
-		a_request_is_sent_with_body_and_content_type("text", "")
+		a_request_is_sent_with_body_and_content_type(postAddressPact, "text", "")
 
 	then.
 		the_response_is_(http.StatusOK).and().
