@@ -7,36 +7,46 @@ import (
 )
 
 type ResponseModificationWriter struct {
-	res          http.ResponseWriter
-	interactions []*interaction
-	statusCode   int
+	res              http.ResponseWriter
+	interactions     []*interaction
+	originalResponse []byte
+	statusCode       int
 }
 
 func (m *ResponseModificationWriter) Header() http.Header {
 	return m.res.Header()
 }
 
-func (m *ResponseModificationWriter) Write(b []byte) (written int, err error) {
-	written = len(b)
+func (m *ResponseModificationWriter) Write(b []byte) (int, error) {
+	originalResponseLength, err := strconv.Atoi(m.res.Header().Get("Content-Length"))
+	if err != nil {
+		return 0, err
+	}
 
+	m.originalResponse = append(m.originalResponse, b...)
+	if len(m.originalResponse) != originalResponseLength {
+		return len(b), nil
+	}
+
+	var modifiedBody []byte
 	for _, i := range m.interactions {
-		b, err = i.Modifiers.modifyBody(b)
+		modifiedBody, err = i.Modifiers.modifyBody(m.originalResponse)
 		if err != nil {
 			return 0, err
 		}
 	}
 
-	m.Header().Set("Content-Length", strconv.Itoa(len(b)))
+	m.Header().Set("Content-Length", strconv.Itoa(len(modifiedBody)))
 	m.res.WriteHeader(m.statusCode)
-	actualBytes, err := m.res.Write(b)
+	writtenBytes, err := m.res.Write(modifiedBody)
 	if err != nil {
 		return 0, err
 	}
 
-	if actualBytes != len(b) {
-		return actualBytes, io.ErrShortWrite
+	if writtenBytes != len(modifiedBody) {
+		return writtenBytes, io.ErrShortWrite
 	}
-	return
+	return len(b), nil
 }
 
 func (m *ResponseModificationWriter) WriteHeader(statusCode int) {
