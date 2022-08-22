@@ -301,7 +301,7 @@ func TestIncorrectContentTypes(t *testing.T) {
 	}
 }
 
-func TestEmptyContentTypeDefaultsToTextPlain(t *testing.T) {
+func TestEmptyContentTypeDefaultsToPlainText(t *testing.T) {
 	given, when, then, teardown := NewProxyStage(t)
 	defer teardown()
 
