@@ -5,6 +5,20 @@ import (
 	"testing"
 )
 
+func TestLargePactResponse(t *testing.T) {
+	given, when, then, teardown := NewProxyStage(t)
+	defer teardown()
+
+	given.a_pact_for_large_string_generation()
+
+	when.
+		a_request_is_sent_to_generate_large_string()
+
+	then.
+		pact_verification_is_successful().and().
+		the_nth_response_body_has_(1, "generated", largeString)
+}
+
 func TestConstraintMatches(t *testing.T) {
 	given, when, then, teardown := NewProxyStage(t)
 	defer teardown()
