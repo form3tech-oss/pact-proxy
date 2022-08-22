@@ -287,7 +287,18 @@ func TestIncorrectContentTypes(t *testing.T) {
 	}
 }
 
-//TODO: complete this test
-func TestEmptyContentType(t *testing.T) {
+func TestEmptyContentTypeDefaultsToTextPlain(t *testing.T) {
+	given, when, then, teardown := NewProxyStage(t)
+	defer teardown()
 
+	given.
+		a_pact_that_expects_plain_text_without_request_content_type_header()
+
+	when.
+		a_request_is_sent_with_body_and_content_type("text", "")
+
+	then.
+		the_response_is_(http.StatusOK).and().
+		the_response_body_to_plain_text_request_is_correct().and().
+		pact_verification_is_successful()
 }

@@ -21,8 +21,8 @@ const (
 )
 
 var supportedMediaTypes = map[string]func([]byte, *url.URL) (requestDocument, error){
-	"application/json": ParseJSONRequest,
-	"text/plain":       ParsePlainTextRequest,
+	mediaTypeJSON: ParseJSONRequest,
+	mediaTypeText: ParsePlainTextRequest,
 }
 
 func StartProxy(server *http.ServeMux, target *url.URL) {
@@ -213,18 +213,13 @@ func (a *api) interactionsWaitHandler(res http.ResponseWriter, req *http.Request
 
 func (a *api) indexHandler(res http.ResponseWriter, req *http.Request) {
 	log.Infof("proxying %s", req.URL.Path)
-	var mediaType string
-	var err error
-	if req.Header.Get("Content-Type") == "" {
-		log.Infof("unable to find media type. Defaulting to JSON")
-		mediaType = "application/json"
-	} else {
-		mediaType, _, err = mime.ParseMediaType(req.Header.Get("Content-Type"))
-		if err != nil {
-			httpresponse.Errorf(res, http.StatusBadRequest, "failed to parse Content-Type. %s", err.Error())
-			return
-		}
+
+	mediaType, err := parseMediaTypeHeader(req.Header)
+	if err != nil {
+		httpresponse.Errorf(res, http.StatusBadRequest, "failed to parse Content-Type header. %s", err.Error())
+		return
 	}
+
 	parseRequest, ok := supportedMediaTypes[mediaType]
 	if !ok {
 		httpresponse.Errorf(res, http.StatusUnsupportedMediaType, "unsupported Media Type: %s", mediaType)
@@ -280,4 +275,18 @@ func (a *api) indexHandler(res http.ResponseWriter, req *http.Request) {
 
 	a.notify.Notify()
 	a.proxy.ServeHTTP(&ResponseModificationWriter{res: res, interactions: matched}, req)
+}
+
+func parseMediaTypeHeader(header http.Header) (string, error) {
+	contentType := header.Get("Content-Type")
+	if contentType == "" {
+		log.Info("Request does not have Content-Type header - defaulting to text/plain")
+		return mediaTypeText, nil
+	}
+
+	mediaType, _, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		return "", err
+	}
+	return mediaType, nil
 }

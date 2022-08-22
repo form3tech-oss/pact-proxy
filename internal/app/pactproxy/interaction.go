@@ -15,7 +15,10 @@ import (
 	"github.com/pkg/errors"
 )
 
-const mediaTypeJSON = "application/json"
+const (
+	mediaTypeJSON = "application/json"
+	mediaTypeText = "text/plain"
+)
 
 type pathMatcher interface {
 	match(val string) bool
@@ -107,13 +110,13 @@ func LoadInteraction(data []byte, alias string) (*interaction, error) {
 	}
 
 	switch mediaType {
-	case "application/json":
+	case mediaTypeJSON:
 		if jsonRequestBody, ok := requestBody.(map[string]interface{}); ok {
 			interaction.addJSONConstraintsFromPact("$.body", matchingRules.(map[string]interface{}), jsonRequestBody)
 			return interaction, nil
 		}
 		return nil, fmt.Errorf("media type is %s but body is not json", mediaType)
-	case "text/plain":
+	case mediaTypeText:
 		if plainTextRequestBody, ok := requestBody.(string); ok {
 			interaction.addTextConstraintsFromPact(matchingRules.(map[string]interface{}), plainTextRequestBody)
 			return interaction, nil
@@ -126,8 +129,8 @@ func LoadInteraction(data []byte, alias string) (*interaction, error) {
 func parseMediaType(request map[string]interface{}) (string, error) {
 	headers, hasHeaders := request["headers"]
 	if !hasHeaders {
-		log.Info("Request has no headers defined - defaulting media type to application/json")
-		return mediaTypeJSON, nil
+		log.Info("Request has no headers defined - defaulting media type to text/plain")
+		return mediaTypeText, nil
 	}
 
 	parsed, ok := headers.(map[string]interface{})
@@ -137,8 +140,8 @@ func parseMediaType(request map[string]interface{}) (string, error) {
 
 	contentType, ok := parsed["Content-Type"]
 	if !ok {
-		log.Info("Request has no Content-Type header defined - defaulting media type to application/json")
-		return mediaTypeJSON, nil
+		log.Info("Request has no Content-Type header defined - defaulting media type to text/plain")
+		return mediaTypeText, nil
 	}
 
 	contentTypeStr, ok := contentType.(string)

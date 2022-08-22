@@ -171,6 +171,23 @@ func (s *ProxyStage) a_pact_that_expects_plain_text_with_request_response(reqBod
 	return s
 }
 
+func (s *ProxyStage) a_pact_that_expects_plain_text_without_request_content_type_header() *ProxyStage {
+	s.pact.
+		AddInteraction().
+		UponReceiving(PostAddressPact).
+		WithRequest(dsl.Request{
+			Method: "POST",
+			Path:   dsl.String("/addresses"),
+			Body:   "text",
+		}).
+		WillRespondWith(dsl.Response{
+			Status:  200,
+			Headers: dsl.MapMatcher{"Content-Type": dsl.String("text/plain")},
+			Body:    "text",
+		})
+	return s
+}
+
 func (s *ProxyStage) a_constraint_is_added(name string) *ProxyStage {
 	s.constraintValue = name
 	return s
