@@ -149,4 +149,3 @@ parameters will wait for all interactions to be called at least once.
 Yes
 
 `go get github.com/form3tech-oss/pact-proxy/pkg/pactproxy`
-
