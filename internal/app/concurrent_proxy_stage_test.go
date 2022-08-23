@@ -80,7 +80,7 @@ func (s *ConcurrentProxyStage) a_modified_address_status_code() *ConcurrentProxy
 func (s *ConcurrentProxyStage) a_pact_that_allows_any_names() *ConcurrentProxyStage {
 	s.pact.
 		AddInteraction().
-		UponReceiving(PostNamePact).
+		UponReceiving(postNamePact).
 		WithRequest(dsl.Request{
 			Method:  "POST",
 			Path:    dsl.String("/users"),
@@ -98,7 +98,7 @@ func (s *ConcurrentProxyStage) a_pact_that_allows_any_names() *ConcurrentProxySt
 func (s *ConcurrentProxyStage) a_pact_that_allows_any_address() *ConcurrentProxyStage {
 	s.pact.
 		AddInteraction().
-		UponReceiving(PostAddressPact).
+		UponReceiving(postAddressPact).
 		WithRequest(dsl.Request{
 			Method:  "POST",
 			Path:    dsl.String("/addresses"),
@@ -129,8 +129,8 @@ func (s *ConcurrentProxyStage) x_concurrent_address_requests_per_second_are_made
 
 func (s *ConcurrentProxyStage) the_concurrent_requests_are_sent() {
 	err := s.pact.Verify(func() (err error) {
-		s.proxy.ForInteraction(PostNamePact).AddModifier("$.status", fmt.Sprintf("%d", s.modifiedNameStatusCode), nil)
-		s.proxy.ForInteraction(PostAddressPact).AddModifier("$.status", fmt.Sprintf("%d", s.modifiedAddressStatusCode), nil)
+		s.proxy.ForInteraction(postNamePact).AddModifier("$.status", fmt.Sprintf("%d", s.modifiedNameStatusCode), nil)
+		s.proxy.ForInteraction(postAddressPact).AddModifier("$.status", fmt.Sprintf("%d", s.modifiedAddressStatusCode), nil)
 
 		wg := sync.WaitGroup{}
 
