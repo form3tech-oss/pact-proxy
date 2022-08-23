@@ -54,7 +54,7 @@ func TestConstraintMatches(t *testing.T) {
 	given.a_pact_that_allows_any_names()
 
 	when.
-		a_constaint_is_added("sam").and().
+		a_constraint_is_added("sam").and().
 		a_request_is_sent_using_the_name("sam")
 
 	then.
@@ -69,7 +69,7 @@ func TestConstraintDoesntMatch(t *testing.T) {
 	given.a_pact_that_allows_any_names()
 
 	when.
-		a_constaint_is_added("sam").and().
+		a_constraint_is_added("sam").and().
 		a_request_is_sent_using_the_name("bob")
 
 	then.pact_verification_is_not_successful()
@@ -199,5 +199,148 @@ func TestModifiedBodyWithFirstAndLastName_ForNRequests(t *testing.T) {
 		the_nth_response_body_has_(2, "last_name", "gud").and().
 		the_nth_response_body_has_(3, "first_name", "any").and().
 		the_nth_response_body_has_(3, "last_name", "any").and().
+		pact_verification_is_successful()
+}
+
+func TestTextPlainContentType(t *testing.T) {
+	given, when, then, teardown := NewProxyStage(t)
+	defer teardown()
+
+	given.
+		a_pact_that_expects_plain_text()
+
+	when.
+		a_request_is_sent_in_plain_text()
+
+	then.
+		the_response_is_(http.StatusOK).and().
+		the_response_body_to_plain_text_request_is_correct().and().
+		pact_verification_is_successful()
+}
+
+func TestModifiedStatusCodeWithPlainTextBody(t *testing.T) {
+	given, when, then, teardown := NewProxyStage(t)
+	defer teardown()
+
+	given.
+		a_pact_that_expects_plain_text().and().
+		a_modified_response_status_of_(http.StatusInternalServerError)
+
+	when.
+		a_request_is_sent_in_plain_text()
+
+	then.
+		the_response_is_(http.StatusInternalServerError).and().
+		the_response_body_to_plain_text_request_is_correct().and().
+		pact_verification_is_successful()
+}
+
+func TestPlainTextConstraintMatches(t *testing.T) {
+	given, when, then, teardown := NewProxyStage(t)
+	defer teardown()
+
+	given.
+		a_pact_that_expects_plain_text()
+
+	when.
+		a_constraint_is_added("text").and().
+		a_request_is_sent_in_plain_text()
+
+	then.
+		the_response_is_(http.StatusOK).and().
+		the_response_body_to_plain_text_request_is_correct().and().
+		pact_verification_is_successful()
+}
+
+func TestPlainTextDefaultConstraintAdded(t *testing.T) {
+	given, when, then, teardown := NewProxyStage(t)
+	defer teardown()
+
+	requestBody := "request body"
+	responseBody := "response body"
+
+	given.
+		a_pact_that_expects_plain_text_with_request_response(requestBody, responseBody)
+
+	when.
+		a_request_is_sent_in_plain_text_with_body("request with doesn't match constraint")
+
+	then.
+		the_response_is_(http.StatusBadRequest).and().
+		pact_verification_is_not_successful()
+}
+
+func TestPlainTextConstraintDoesNotMatch(t *testing.T) {
+	given, when, then, teardown := NewProxyStage(t)
+	defer teardown()
+
+	given.
+		a_pact_that_expects_plain_text()
+
+	when.
+		a_constraint_is_added("incorrect file content").and().
+		a_request_is_sent_in_plain_text()
+
+	then.
+		the_response_is_(http.StatusBadRequest).and().
+		pact_verification_is_not_successful()
+}
+
+func TestPlainTextDifferentRequestAndResponseBodies(t *testing.T) {
+	given, when, then, teardown := NewProxyStage(t)
+	defer teardown()
+
+	requestBody := "request body"
+	responseBody := "response body"
+	requestConstraint := "request body"
+
+	given.
+		a_pact_that_expects_plain_text_with_request_response(requestBody, responseBody)
+
+	when.
+		a_constraint_is_added(requestConstraint).and().
+		a_request_is_sent_in_plain_text_with_body(requestBody)
+
+	then.
+		the_response_is_(http.StatusOK).and().
+		the_response_body_is([]byte(responseBody)).and().
+		pact_verification_is_successful()
+}
+
+func TestIncorrectContentTypes(t *testing.T) {
+	for contentType, wantResponse := range map[string]int{
+		"image/bmp":      http.StatusUnsupportedMediaType,
+		"invalid format": http.StatusBadRequest,
+	} {
+		t.Run(contentType, func(t *testing.T) {
+			given, when, then, teardown := NewProxyStage(t)
+			defer teardown()
+
+			given.
+				a_pact_that_expects_plain_text()
+
+			when.
+				a_request_is_sent_with_body_and_content_type("req body", contentType)
+
+			then.
+				the_response_is_(wantResponse).and().
+				pact_verification_is_not_successful()
+		})
+	}
+}
+
+func TestEmptyContentTypeDefaultsToPlainText(t *testing.T) {
+	given, when, then, teardown := NewProxyStage(t)
+	defer teardown()
+
+	given.
+		a_pact_that_expects_plain_text_without_request_content_type_header()
+
+	when.
+		a_request_is_sent_with_body_and_content_type("text", "")
+
+	then.
+		the_response_is_(http.StatusOK).and().
+		the_response_body_to_plain_text_request_is_correct().and().
 		pact_verification_is_successful()
 }

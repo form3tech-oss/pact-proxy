@@ -3,6 +3,7 @@ package pactproxy
 import (
 	"bytes"
 	"io/ioutil"
+	"mime"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -18,6 +19,11 @@ const (
 	defaultDelay    = 500 * time.Millisecond
 	defaultDuration = 15 * time.Second
 )
+
+var supportedMediaTypes = map[string]func([]byte, *url.URL) (requestDocument, error){
+	mediaTypeJSON: ParseJSONRequest,
+	mediaTypeText: ParsePlainTextRequest,
+}
 
 func StartProxy(server *http.ServeMux, target *url.URL) {
 	api := api{
@@ -207,6 +213,19 @@ func (a *api) interactionsWaitHandler(res http.ResponseWriter, req *http.Request
 
 func (a *api) indexHandler(res http.ResponseWriter, req *http.Request) {
 	log.Infof("proxying %s", req.URL.Path)
+
+	mediaType, err := parseMediaTypeHeader(req.Header)
+	if err != nil {
+		httpresponse.Errorf(res, http.StatusBadRequest, "failed to parse Content-Type header. %s", err.Error())
+		return
+	}
+
+	parseRequest, ok := supportedMediaTypes[mediaType]
+	if !ok {
+		httpresponse.Errorf(res, http.StatusUnsupportedMediaType, "unsupported Media Type: %s", mediaType)
+		return
+	}
+
 	allInteractions, ok := a.interactions.FindAll(req.URL.Path, req.Method)
 	if !ok {
 		httpresponse.Errorf(res, http.StatusBadRequest, "unable to find interaction to Match '%s %s'", req.Method, req.URL.Path)
@@ -227,7 +246,7 @@ func (a *api) indexHandler(res http.ResponseWriter, req *http.Request) {
 
 	req.Body = ioutil.NopCloser(bytes.NewBuffer(data))
 
-	request, err := LoadRequest(data, req.URL)
+	request, err := parseRequest(data, req.URL)
 	if err != nil {
 		httpresponse.Errorf(res, http.StatusInternalServerError, "unable to read requestDocument data. %s", err.Error())
 		return
@@ -256,4 +275,18 @@ func (a *api) indexHandler(res http.ResponseWriter, req *http.Request) {
 
 	a.notify.Notify()
 	a.proxy.ServeHTTP(&ResponseModificationWriter{res: res, interactions: matched}, req)
+}
+
+func parseMediaTypeHeader(header http.Header) (string, error) {
+	contentType := header.Get("Content-Type")
+	if contentType == "" {
+		log.Info("Request does not have Content-Type header - defaulting to text/plain")
+		return mediaTypeText, nil
+	}
+
+	mediaType, _, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		return "", err
+	}
+	return mediaType, nil
 }

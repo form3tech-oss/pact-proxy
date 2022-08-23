@@ -10,7 +10,7 @@ import (
 
 type requestDocument map[string]interface{}
 
-func LoadRequest(data []byte, url *url.URL) (requestDocument, error) {
+func ParseJSONRequest(data []byte, url *url.URL) (requestDocument, error) {
 	body := make(map[string]interface{})
 	if len(data) > 0 {
 		err := json.Unmarshal(data, &body)
@@ -18,19 +18,33 @@ func LoadRequest(data []byte, url *url.URL) (requestDocument, error) {
 			return nil, errors.Wrap(err, "unable to parse requestDocument body")
 		}
 	}
-
-	queryValues := make(map[string]interface{})
-	for q, v := range url.Query() {
-		if len(v) > 0 {
-			escapeValue(queryValues, q, v[0])
-		}
-	}
+	queryValues := parseQueryValues(url)
 
 	return map[string]interface{}{
 		"path":  url.Path,
 		"body":  body,
 		"query": queryValues,
 	}, nil
+}
+
+func ParsePlainTextRequest(data []byte, url *url.URL) (requestDocument, error) {
+	queryValues := parseQueryValues(url)
+
+	return map[string]interface{}{
+		"path":  url.Path,
+		"body":  string(data),
+		"query": queryValues,
+	}, nil
+}
+
+func parseQueryValues(url *url.URL) map[string]interface{} {
+	queryValues := make(map[string]interface{})
+	for q, v := range url.Query() {
+		if len(v) > 0 {
+			escapeValue(queryValues, q, v[0])
+		}
+	}
+	return queryValues
 }
 
 func (r requestDocument) encodeValues(val string) string {

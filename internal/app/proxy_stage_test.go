@@ -178,7 +178,46 @@ func (s *ProxyStage) a_pact_that_allows_any_address() *ProxyStage {
 	return s
 }
 
-func (s *ProxyStage) a_constaint_is_added(name string) *ProxyStage {
+func (s *ProxyStage) a_pact_that_expects_plain_text() *ProxyStage {
+	return s.a_pact_that_expects_plain_text_with_request_response("text", "text")
+}
+
+func (s *ProxyStage) a_pact_that_expects_plain_text_with_request_response(reqBody string, respBody string) *ProxyStage {
+	s.pact.
+		AddInteraction().
+		UponReceiving(postAddressPact).
+		WithRequest(dsl.Request{
+			Method:  "POST",
+			Path:    dsl.String("/addresses"),
+			Headers: dsl.MapMatcher{"Content-Type": dsl.String("text/plain")},
+			Body:    reqBody,
+		}).
+		WillRespondWith(dsl.Response{
+			Status:  200,
+			Headers: dsl.MapMatcher{"Content-Type": dsl.String("text/plain")},
+			Body:    respBody,
+		})
+	return s
+}
+
+func (s *ProxyStage) a_pact_that_expects_plain_text_without_request_content_type_header() *ProxyStage {
+	s.pact.
+		AddInteraction().
+		UponReceiving(postAddressPact).
+		WithRequest(dsl.Request{
+			Method: "POST",
+			Path:   dsl.String("/addresses"),
+			Body:   "text",
+		}).
+		WillRespondWith(dsl.Response{
+			Status:  200,
+			Headers: dsl.MapMatcher{"Content-Type": dsl.String("text/plain")},
+			Body:    "text",
+		})
+	return s
+}
+
+func (s *ProxyStage) a_constraint_is_added(name string) *ProxyStage {
 	s.constraintValue = name
 	return s
 }
@@ -219,6 +258,51 @@ func (s *ProxyStage) a_request_is_sent_using_the_name(name string) {
 		}
 
 		req.Header.Set("Content-Type", "application/json")
+
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return err
+		}
+		s.responses = append(s.responses, res)
+		bodyBytes, err := io.ReadAll(res.Body)
+		if err != nil {
+			s.t.Fatalf("unable to read response body, %v", err)
+		}
+		s.responseBodies = append(s.responseBodies, bodyBytes)
+		return nil
+	})
+}
+
+func (s *ProxyStage) a_request_is_sent_in_plain_text() {
+	s.a_request_is_sent_in_plain_text_with_body("text")
+}
+
+func (s *ProxyStage) a_request_is_sent_in_plain_text_with_body(body string) {
+	s.a_request_is_sent_with_body_and_content_type(body, "text/plain")
+}
+
+func (s *ProxyStage) a_request_is_sent_with_body_and_content_type(body, contentType string) {
+	s.pactResult = s.pact.Verify(func() (err error) {
+		i := s.proxy.
+			ForInteraction(postAddressPact)
+
+		if s.modifiedStatusCode != 0 {
+			i.AddModifier("$.status", fmt.Sprintf("%d", s.modifiedStatusCode), s.modifiedAttempt)
+		}
+
+		if s.constraintValue != "" {
+			i.AddConstraint("$.body", s.constraintValue)
+		}
+
+		u := fmt.Sprintf("http://localhost:%s/addresses", proxyURL.Port())
+		req, err := http.NewRequest("POST", u, strings.NewReader(body))
+		if err != nil {
+			return err
+		}
+
+		if contentType != "" {
+			req.Header.Set("Content-Type", contentType)
+		}
 
 		res, err := http.DefaultClient.Do(req)
 		if err != nil {
@@ -415,7 +499,7 @@ func (s *ProxyStage) the_nth_response_is_(n, statusCode int) *ProxyStage {
 	}
 
 	if s.responses[n-1].StatusCode != statusCode {
-		s.t.Fatalf("Expected status code on attemt %d: %d, got : %d", n, statusCode, s.responses[n-1].StatusCode)
+		s.t.Fatalf("Expected status code on attempt %d: %d, got : %d", n, statusCode, s.responses[n-1].StatusCode)
 	}
 
 	return s
@@ -450,6 +534,27 @@ func (s *ProxyStage) the_nth_response_body_has_(n int, key, value string) *Proxy
 
 	if responseBody[key] != value {
 		s.t.Fatalf("Expected %s on attempt %d,: %s, got: %s", key, n, value, responseBody[key])
+	}
+
+	return s
+}
+
+func (s *ProxyStage) the_response_body_is(data []byte) *ProxyStage {
+	return s.the_nth_response_body_is(1, data)
+}
+
+func (s *ProxyStage) the_response_body_to_plain_text_request_is_correct() *ProxyStage {
+	return s.the_nth_response_body_is(1, []byte("text"))
+}
+
+func (s *ProxyStage) the_nth_response_body_is(n int, data []byte) *ProxyStage {
+	if len(s.responseBodies) < n {
+		s.t.Fatalf("Expected at least %d responses, got %d", n, len(s.responseBodies))
+	}
+
+	body := s.responseBodies[n-1]
+	if c := bytes.Compare(body, data); c != 0 {
+		s.t.Fatalf("Expected body did not match. Expected: %s, got: %s", data, body)
 	}
 
 	return s

@@ -3,6 +3,7 @@ package pactproxy
 import (
 	"encoding/json"
 	"fmt"
+	"mime"
 	"reflect"
 	"regexp"
 	"sync"
@@ -12,6 +13,11 @@ import (
 
 	"github.com/PaesslerAG/jsonpath"
 	"github.com/pkg/errors"
+)
+
+const (
+	mediaTypeJSON = "application/json"
+	mediaTypeText = "text/plain"
 )
 
 type pathMatcher interface {
@@ -93,25 +99,74 @@ func LoadInteraction(data []byte, alias string) (*interaction, error) {
 		modifiers:   sync.Map{},
 	}
 
-	if requestBody, hasRequestBody := request["body"]; hasRequestBody {
-		interaction.addConstraintsFromPact("$.body", matchingRules.(map[string]interface{}), requestBody.(map[string]interface{}))
+	requestBody, ok := request["body"]
+	if !ok {
+		return interaction, nil
 	}
 
-	if !hasRules {
-		matchingRules = make(map[string]interface{})
+	mediaType, err := parseMediaType(request)
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to parse media type")
 	}
 
-	return interaction, nil
+	switch mediaType {
+	case mediaTypeJSON:
+		if jsonRequestBody, ok := requestBody.(map[string]interface{}); ok {
+			interaction.addJSONConstraintsFromPact("$.body", matchingRules.(map[string]interface{}), jsonRequestBody)
+			return interaction, nil
+		}
+		return nil, fmt.Errorf("media type is %s but body is not json", mediaType)
+	case mediaTypeText:
+		if plainTextRequestBody, ok := requestBody.(string); ok {
+			interaction.addTextConstraintsFromPact(matchingRules.(map[string]interface{}), plainTextRequestBody)
+			return interaction, nil
+		}
+		return nil, fmt.Errorf("media type is %s but body is not text", mediaType)
+	}
+	return nil, fmt.Errorf("unsupported media type %s", mediaType)
 }
 
-func (i *interaction) addConstraintsFromPact(path string, matchingRules, values map[string]interface{}) {
+func parseMediaType(request map[string]interface{}) (string, error) {
+	headers, hasHeaders := request["headers"]
+	if !hasHeaders {
+		log.Info("Request has no headers defined - defaulting media type to text/plain")
+		return mediaTypeText, nil
+	}
+
+	parsed, ok := headers.(map[string]interface{})
+	if !ok {
+		return "", errors.New("incorrect format of request headers")
+	}
+
+	contentType, ok := parsed["Content-Type"]
+	if !ok {
+		log.Info("Request has no Content-Type header defined - defaulting media type to text/plain")
+		return mediaTypeText, nil
+	}
+
+	contentTypeStr, ok := contentType.(string)
+	if !ok {
+		return "", errors.New("incorrect format of Content-Type header")
+	}
+
+	mediaType, _, err := mime.ParseMediaType(contentTypeStr)
+	if err != nil {
+		return "", err
+	}
+
+	return mediaType, nil
+}
+
+// This function adds constraints for all the fields in the JSON request body which do not
+// have a corresponding matching rule
+func (i *interaction) addJSONConstraintsFromPact(path string, matchingRules, values map[string]interface{}) {
 	for k, v := range values {
 		switch val := v.(type) {
 		case map[string]interface{}:
 			if _, exists := val["json_class"]; exists {
 				continue
 			}
-			i.addConstraintsFromPact(path+"."+k, matchingRules, val)
+			i.addJSONConstraintsFromPact(path+"."+k, matchingRules, val)
 		default:
 			p := path + "." + k
 			if _, hasRule := matchingRules[p]; !hasRule {
@@ -125,6 +180,17 @@ func (i *interaction) addConstraintsFromPact(path string, matchingRules, values 
 	}
 }
 
+// This function adds constraints for the entire plain text request body if
+// it doesn't have a corresponding matching rule
+func (i *interaction) addTextConstraintsFromPact(matchingRules interface{}, constraint string) {
+	if _, present := matchingRules.(map[string]interface{})["$.body"]; !present {
+		i.AddConstraint(interactionConstraint{
+			Path:   "$.body",
+			Format: "%v",
+			Values: []interface{}{constraint},
+		})
+	}
+}
 func (i *interaction) Match(path, method string) bool {
 	return method == i.method && i.pathMatcher.match(path)
 }
