@@ -129,6 +129,17 @@ func (p *PactProxy) WaitForInteraction(interaction string, count int) error {
 	return nil
 }
 
+func (p *PactProxy) IsReady() error {
+	res, err := p.client.Get(strings.TrimSuffix(p.url, "/") + "/ready")
+	if err != nil {
+		return err
+	}
+	if res.StatusCode != http.StatusOK {
+		return errors.New("unexpected status code" + strconv.Itoa(res.StatusCode))
+	}
+	return nil
+}
+
 func (s InteractionSetup) AddConstraint(path, value string) InteractionSetup {
 	s.pactProxy.addConstraint(s.interaction, path, value)
 	return s

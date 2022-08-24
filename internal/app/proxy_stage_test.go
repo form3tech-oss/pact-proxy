@@ -5,113 +5,93 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/avast/retry-go/v4"
+	"github.com/form3tech-oss/pact-proxy/pkg/pactproxy"
+	"github.com/pact-foundation/pact-go/dsl"
+	"github.com/pkg/errors"
 	"io"
 	"net/http"
 	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
-
-	"github.com/form3tech-oss/pact-proxy/pkg/pactproxy"
-	"github.com/pact-foundation/pact-go/dsl"
+	"time"
 )
 
 type ProxyStage struct {
-	t                  *testing.T
-	pact               *dsl.Pact
-	proxy              *pactproxy.PactProxy
-	constraintValue    string
-	pactResult         error
-	pactPathMap        map[string]string
-	requestsToSend     int32
-	requestsSent       int32
-	responses          []*http.Response
-	responseBodies     [][]byte
-	modifiedStatusCode int
-	modifiedAttempt    *int
-	modifiedBody       map[string]string
+	t                   *testing.T
+	pact                *dsl.Pact
+	proxy               *pactproxy.PactProxy
+	nameConstraintValue string
+	bodyConstraintValue string
+	pactResult          error
+	pactName            string
+	requestsToSend      int32
+	requestsSent        int32
+	responses           []*http.Response
+	responseBodies      [][]byte
+	modifiedStatusCode  int
+	modifiedAttempt     *int
+	modifiedBody        map[string]string
 }
-
-const (
-	postNamePact        = "A request to create a user"
-	postAddressPact     = "A request to create an address"
-	postLargeStringPact = "A request to create car with large response"
-)
 
 var largeString = strings.Repeat("long_string123BBmmF8BYezrBhCROOCRJfeH5k69hMKXH77TSvwF5GHUZFnbh1dsZ3d90HeR0jUIOovJJVS508uI17djeLFFSb7", 440)
 
-func NewProxyStage(t *testing.T) (*ProxyStage, *ProxyStage, *ProxyStage, func()) {
-	pact := &dsl.Pact{
-		Consumer: "MyConsumer",
-		Provider: "MyProvider",
-		Host:     "localhost",
-	}
-
-	pact.Setup(true)
-	proxy, err := pactproxy.
-		Configuration(adminURL.String()).
-		SetupProxy(proxyURL.String(), fmt.Sprintf("http://%s:%d", pact.Host, pact.Server.Port))
+func NewProxyStage(t *testing.T) (*ProxyStage, *ProxyStage, *ProxyStage) {
+	proxy, err := setupAndWaitForProxy()
 	if err != nil {
 		t.Logf("Error setting up proxy: %v", err)
 		t.Fail()
 	}
 
-	pact.Server.Port, err = strconv.Atoi(proxyURL.Port())
-	if err != nil {
-		t.Logf("Error parsing server port: %v", err)
-		t.Fail()
-	}
-
-	stage := &ProxyStage{
+	s := &ProxyStage{
 		t:            t,
 		proxy:        proxy,
 		pact:         pact,
 		modifiedBody: make(map[string]string),
-		pactPathMap: map[string]string{
-			postNamePact:        "/users",
-			postAddressPact:     "/addresses",
-			postLargeStringPact: "/string",
-		},
+		pactName:     "pact-" + strconv.FormatInt(time.Now().UnixMilli(), 10),
 	}
 
-	return stage, stage, stage, func() {
+	s.t.Cleanup(func() {
 		pactproxy.Configuration(adminURL.String()).Reset()
-		pact.Teardown()
+	})
+
+	return s, s, s
+}
+
+func setupAndWaitForProxy() (*pactproxy.PactProxy, error) {
+	proxy, err := pactproxy.
+		Configuration(adminURL.String()).
+		SetupProxy(proxyURL.String(), fmt.Sprintf("http://%s:%d", pact.Host, originalPactServerPort))
+	if err != nil {
+		return nil, errors.Wrap(err, "proxy setup failed")
 	}
+
+	retryOpts := []retry.Option{
+		retry.Attempts(10),
+		retry.DelayType(retry.FixedDelay),
+		retry.Delay(500 * time.Millisecond),
+	}
+
+	err = retry.Do(proxy.IsReady, retryOpts...)
+	if err != nil {
+		return nil, errors.Wrap(err, "proxy readiness wait failed")
+	}
+
+	return proxy, nil
 }
 
 func (s *ProxyStage) and() *ProxyStage {
 	return s
 }
 
-func (s *ProxyStage) a_pact_for_large_string_generation() *ProxyStage {
-	s.pact.
-		AddInteraction().
-		UponReceiving(postLargeStringPact).
-		WithRequest(dsl.Request{
-			Method:  "POST",
-			Path:    dsl.String(s.pactPathMap[postLargeStringPact]),
-			Headers: dsl.MapMatcher{"Content-Type": dsl.String("application/json")},
-			Body:    dsl.MapMatcher{"string": dsl.String("large")},
-		}).
-		WillRespondWith(dsl.Response{
-			Status:  200,
-			Headers: dsl.MapMatcher{"Content-Type": dsl.String("application/json")},
-			Body: dsl.MapMatcher{
-				"generated": dsl.String(largeString),
-				"name":      dsl.Regex("any", ".*"),
-			},
-		})
-	return s
-}
-
 func (s *ProxyStage) a_pact_that_allows_any_names() *ProxyStage {
 	s.pact.
 		AddInteraction().
-		UponReceiving(postNamePact).
+		UponReceiving(s.pactName).
 		WithRequest(dsl.Request{
 			Method:  "POST",
-			Path:    dsl.String(s.pactPathMap[postNamePact]),
+			Path:    dsl.String("/users"),
 			Headers: dsl.MapMatcher{"Content-Type": dsl.String("application/json")},
 			Body:    dsl.MapMatcher{"name": dsl.Regex("any", ".*")},
 		}).
@@ -123,13 +103,13 @@ func (s *ProxyStage) a_pact_that_allows_any_names() *ProxyStage {
 	return s
 }
 
-func (s *ProxyStage) a_pact_that_returns_no_body() *ProxyStage {
+func (s *ProxyStage) a_pact_that_allows_any_names_and_returns_no_body() *ProxyStage {
 	s.pact.
 		AddInteraction().
-		UponReceiving(postNamePact).
+		UponReceiving(s.pactName).
 		WithRequest(dsl.Request{
 			Method:  "POST",
-			Path:    dsl.String(s.pactPathMap[postNamePact]),
+			Path:    dsl.String("/users"),
 			Headers: dsl.MapMatcher{"Content-Type": dsl.String("application/json")},
 			Body:    dsl.MapMatcher{"name": dsl.Regex("any", ".*")},
 		}).
@@ -140,13 +120,34 @@ func (s *ProxyStage) a_pact_that_returns_no_body() *ProxyStage {
 	return s
 }
 
+func (s *ProxyStage) a_pact_that_allows_any_names_and_returns_large_body_and_any_name() *ProxyStage {
+	s.pact.
+		AddInteraction().
+		UponReceiving(s.pactName).
+		WithRequest(dsl.Request{
+			Method:  "POST",
+			Path:    dsl.String("/users"),
+			Headers: dsl.MapMatcher{"Content-Type": dsl.String("application/json")},
+			Body:    dsl.MapMatcher{"name": dsl.Regex("any", ".*")},
+		}).
+		WillRespondWith(dsl.Response{
+			Status:  200,
+			Headers: dsl.MapMatcher{"Content-Type": dsl.String("application/json")},
+			Body: dsl.MapMatcher{
+				"large_string": dsl.String(largeString),
+				"name":         dsl.String("any"),
+			},
+		})
+	return s
+}
+
 func (s *ProxyStage) a_pact_that_allows_any_first_and_last_names() *ProxyStage {
 	s.pact.
 		AddInteraction().
-		UponReceiving(postNamePact).
+		UponReceiving(s.pactName).
 		WithRequest(dsl.Request{
 			Method:  "POST",
-			Path:    dsl.String(s.pactPathMap[postNamePact]),
+			Path:    dsl.String("/users"),
 			Headers: dsl.MapMatcher{"Content-Type": dsl.String("application/json")},
 			Body: dsl.MapMatcher{
 				"first_name": dsl.Regex("any", ".*"),
@@ -161,41 +162,38 @@ func (s *ProxyStage) a_pact_that_allows_any_first_and_last_names() *ProxyStage {
 	return s
 }
 
-func (s *ProxyStage) a_pact_that_allows_any_address() *ProxyStage {
+func (s *ProxyStage) a_pact_that_expects_plain_text() *ProxyStage {
 	s.pact.
 		AddInteraction().
-		UponReceiving(postAddressPact).
+		UponReceiving(s.pactName).
 		WithRequest(dsl.Request{
 			Method:  "POST",
-			Path:    dsl.String(s.pactPathMap[postAddressPact]),
-			Headers: dsl.MapMatcher{"Content-Type": dsl.String("application/json")},
+			Path:    dsl.String("/users"),
+			Headers: dsl.MapMatcher{"Content-Type": dsl.String("text/plain")},
+			Body:    "text",
 		}).
 		WillRespondWith(dsl.Response{
 			Status:  200,
-			Headers: dsl.MapMatcher{"Content-Type": dsl.String("application/json")},
-			Body:    map[string]string{"address": "any"},
+			Headers: dsl.MapMatcher{"Content-Type": dsl.String("text/plain")},
+			Body:    "text",
 		})
 	return s
 }
 
-func (s *ProxyStage) a_pact_that_expects_plain_text() *ProxyStage {
-	return s.a_pact_that_expects_plain_text_with_request_response("text", "text")
-}
-
-func (s *ProxyStage) a_pact_that_expects_plain_text_with_request_response(reqBody string, respBody string) *ProxyStage {
+func (s *ProxyStage) a_pact_that_expects_plain_text_with_request_response(req, resp string) *ProxyStage {
 	s.pact.
 		AddInteraction().
-		UponReceiving(postAddressPact).
+		UponReceiving(s.pactName).
 		WithRequest(dsl.Request{
 			Method:  "POST",
-			Path:    dsl.String("/addresses"),
+			Path:    dsl.String("/users"),
 			Headers: dsl.MapMatcher{"Content-Type": dsl.String("text/plain")},
-			Body:    reqBody,
+			Body:    req,
 		}).
 		WillRespondWith(dsl.Response{
 			Status:  200,
 			Headers: dsl.MapMatcher{"Content-Type": dsl.String("text/plain")},
-			Body:    respBody,
+			Body:    resp,
 		})
 	return s
 }
@@ -203,10 +201,10 @@ func (s *ProxyStage) a_pact_that_expects_plain_text_with_request_response(reqBod
 func (s *ProxyStage) a_pact_that_expects_plain_text_without_request_content_type_header() *ProxyStage {
 	s.pact.
 		AddInteraction().
-		UponReceiving(postAddressPact).
+		UponReceiving(s.pactName).
 		WithRequest(dsl.Request{
 			Method: "POST",
-			Path:   dsl.String("/addresses"),
+			Path:   dsl.String("/users"),
 			Body:   "text",
 		}).
 		WillRespondWith(dsl.Response{
@@ -217,168 +215,105 @@ func (s *ProxyStage) a_pact_that_expects_plain_text_without_request_content_type
 	return s
 }
 
-func (s *ProxyStage) a_constraint_is_added(name string) *ProxyStage {
-	s.constraintValue = name
+func (s *ProxyStage) a_name_constraint_is_added(name string) *ProxyStage {
+	s.nameConstraintValue = name
 	return s
 }
 
-func (s *ProxyStage) a_request_is_sent_to_generate_large_string() *ProxyStage {
-	s.pactResult = s.pact.Verify(func() (err error) {
-		u := fmt.Sprintf("http://localhost:%s%s", proxyURL.Port(), s.pactPathMap[postLargeStringPact])
-		req, err := http.NewRequest("POST", u, strings.NewReader(`{"string":"large"}`))
-		if err != nil {
-			return err
-		}
-
-		req.Header.Set("Content-Type", "application/json")
-		res, err := http.DefaultClient.Do(req)
-		if err != nil {
-			return err
-		}
-		s.responses = append(s.responses, res)
-		bodyBytes, err := io.ReadAll(res.Body)
-		if err != nil {
-			s.t.Fatalf("unable to read response body, %v", err)
-		}
-		s.responseBodies = append(s.responseBodies, bodyBytes)
-		return nil
-	})
+func (s *ProxyStage) a_body_constraint_is_added(name string) *ProxyStage {
+	s.bodyConstraintValue = name
 	return s
+}
+
+func (s *ProxyStage) a_modified_response_status_of_(statusCode int) *ProxyStage {
+	s.modifiedStatusCode = statusCode
+	return s
+}
+
+func (s *ProxyStage) a_modified_response_body_of_(path, value string) *ProxyStage {
+	s.modifiedBody[path] = value
+	return s
+}
+
+func (s *ProxyStage) a_modified_response_attempt_of(i int) {
+	s.modifiedAttempt = &i
+}
+
+func (s *ProxyStage) a_plain_text_request_is_sent() {
+	s.a_plain_text_request_is_sent_with_body("text")
+}
+
+func (s *ProxyStage) a_plain_text_request_is_sent_with_body(body string) {
+	s.n_requests_are_sent_using_the_body_and_content_type(1, body, "text/plain")
 }
 
 func (s *ProxyStage) a_request_is_sent_using_the_name(name string) {
-	s.pactResult = s.pact.Verify(func() (err error) {
-		s.proxy.ForInteraction(postNamePact).AddConstraint("$.body.name",
-			s.constraintValue)
-
-		u := fmt.Sprintf("http://localhost:%s%s", proxyURL.Port(), s.pactPathMap[postNamePact])
-		req, err := http.NewRequest("POST", u, strings.NewReader(fmt.Sprintf(`{"name":"%s"}`, name)))
-		if err != nil {
-			return err
-		}
-
-		req.Header.Set("Content-Type", "application/json")
-
-		res, err := http.DefaultClient.Do(req)
-		if err != nil {
-			return err
-		}
-		s.responses = append(s.responses, res)
-		bodyBytes, err := io.ReadAll(res.Body)
-		if err != nil {
-			s.t.Fatalf("unable to read response body, %v", err)
-		}
-		s.responseBodies = append(s.responseBodies, bodyBytes)
-		return nil
-	})
+	s.n_requests_are_sent_using_the_name(1, name)
 }
 
-func (s *ProxyStage) a_request_is_sent_in_plain_text() {
-	s.a_request_is_sent_in_plain_text_with_body("text")
+func (s *ProxyStage) n_requests_are_sent_using_the_name(n int, name string) {
+	s.n_requests_are_sent_using_the_body(n, fmt.Sprintf(`{"name":"%s"}`, name))
 }
 
-func (s *ProxyStage) a_request_is_sent_in_plain_text_with_body(body string) {
-	s.a_request_is_sent_with_body_and_content_type(body, "text/plain")
+func (s *ProxyStage) n_requests_are_sent_using_the_body(n int, body string) {
+	s.n_requests_are_sent_using_the_body_and_content_type(n, body, "application/json")
 }
 
-func (s *ProxyStage) a_request_is_sent_with_body_and_content_type(body, contentType string) {
-	s.pactResult = s.pact.Verify(func() (err error) {
+func (s *ProxyStage) n_requests_are_sent_using_the_body_and_content_type(n int, body, contentType string) {
+	s.pactResult = s.pact.Verify(func() error {
 		i := s.proxy.
-			ForInteraction(postAddressPact)
+			ForInteraction(s.pactName)
+
+		if s.nameConstraintValue != "" {
+			i.AddConstraint("$.body.name", s.nameConstraintValue)
+		}
+
+		if s.bodyConstraintValue != "" {
+			i.AddConstraint("$.body", s.bodyConstraintValue)
+		}
 
 		if s.modifiedStatusCode != 0 {
 			i.AddModifier("$.status", fmt.Sprintf("%d", s.modifiedStatusCode), s.modifiedAttempt)
 		}
 
-		if s.constraintValue != "" {
-			i.AddConstraint("$.body", s.constraintValue)
+		if len(s.modifiedBody) > 0 {
+			for path, value := range s.modifiedBody {
+				i.AddModifier(path, value, s.modifiedAttempt)
+			}
 		}
 
-		u := fmt.Sprintf("http://localhost:%s/addresses", proxyURL.Port())
-		req, err := http.NewRequest("POST", u, strings.NewReader(body))
-		if err != nil {
-			return err
-		}
-
-		if contentType != "" {
-			req.Header.Set("Content-Type", contentType)
-		}
-
-		res, err := http.DefaultClient.Do(req)
-		if err != nil {
-			return err
-		}
-		s.responses = append(s.responses, res)
-		bodyBytes, err := io.ReadAll(res.Body)
-		if err != nil {
-			s.t.Fatalf("unable to read response body, %v", err)
-		}
-		s.responseBodies = append(s.responseBodies, bodyBytes)
-		return nil
-	})
-}
-
-func (s *ProxyStage) a_request_is_sent_with_modifiers_using_the_name(pact, name string) {
-	s.n_requests_are_sent_with_modifiers_using_the_name(pact, 1, name)
-}
-
-func (s *ProxyStage) n_requests_are_sent_with_modifiers_using_the_name(pact string, n int, name string) {
-	s.n_requests_are_sent_with_modifiers_using_the_body(pact, n, fmt.Sprintf(`{"name":"%s"}`, name))
-}
-
-func (s *ProxyStage) n_requests_are_sent_with_modifiers_using_the_body(pact string, n int, body string) {
-	s.pactResult = s.pact.Verify(func() (err error) {
-		i := s.proxy.
-			ForInteraction(pact)
-
-		if s.modifiedStatusCode != 0 {
-			i.AddModifier("$.status", fmt.Sprintf("%d", s.modifiedStatusCode), s.modifiedAttempt)
-		}
-
-		for path, value := range s.modifiedBody {
-			i.AddModifier(path, value, s.modifiedAttempt)
-		}
-
-		u := fmt.Sprintf("http://localhost:%s%s", proxyURL.Port(), s.pactPathMap[pact])
-
+		u := fmt.Sprintf("http://localhost:%s/users", proxyURL.Port())
 		for i := 0; i < n; i++ {
-			req, err := http.NewRequest("POST", u, strings.NewReader(body))
-			if err != nil {
+			if err := s.send_post_request_and_collect_response(body, u, contentType); err != nil {
 				return err
 			}
-
-			req.Header.Set("Content-Type", "application/json")
-			res, err := http.DefaultClient.Do(req)
-			if err != nil {
-				s.t.Error(err)
-				return err
-			}
-			s.responses = append(s.responses, res)
-			bodyBytes, err := io.ReadAll(res.Body)
-			if err != nil {
-				s.t.Fatalf("unable to read response body, %v", err)
-			}
-			s.responseBodies = append(s.responseBodies, bodyBytes)
 		}
-
 		return nil
 	})
 }
 
-func (s *ProxyStage) pact_verification_is_successful() *ProxyStage {
-	if s.pactResult != nil {
-		s.t.Error(s.pactResult)
-		s.t.Fail()
+func (s *ProxyStage) send_post_request_and_collect_response(body, url, contentType string) error {
+	req, err := http.NewRequest("POST", url, strings.NewReader(body))
+	if err != nil {
+		s.t.Errorf("request creation failed: %v", err)
+		return err
 	}
 
-	return s
-}
-
-func (s *ProxyStage) pact_verification_is_not_successful() {
-	if s.pactResult == nil {
-		s.t.Error("pact verification did not fail")
-		s.t.Fail()
+	req.Header.Set("Content-Type", contentType)
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		s.t.Errorf("sending request failed: %v", err)
+		return err
 	}
+
+	s.responses = append(s.responses, res)
+	bodyBytes, err := io.ReadAll(res.Body)
+	if err != nil {
+		s.t.Errorf("unable to read response body: %v", err)
+		return err
+	}
+	s.responseBodies = append(s.responseBodies, bodyBytes)
+	return nil
 }
 
 func (s *ProxyStage) multiple_requests_are_sent(requestsToSend int32) {
@@ -387,7 +322,7 @@ func (s *ProxyStage) multiple_requests_are_sent(requestsToSend int32) {
 		atomic.StoreInt32(&s.requestsSent, 0)
 		go func() {
 			for i := int32(0); i < requestsToSend; i++ {
-				u := fmt.Sprintf("http://localhost:%s%s", proxyURL.Port(), s.pactPathMap[postNamePact])
+				u := fmt.Sprintf("http://localhost:%s/users", proxyURL.Port())
 				req, err := http.NewRequest("POST", u, strings.NewReader(`{"name":"test"}`))
 				if err != nil {
 					s.t.Error(err)
@@ -403,13 +338,29 @@ func (s *ProxyStage) multiple_requests_are_sent(requestsToSend int32) {
 			}
 		}()
 
-		if err := s.proxy.WaitForInteraction(postNamePact, int(requestsToSend)); err != nil {
+		if err := s.proxy.WaitForInteraction(s.pactName, int(requestsToSend)); err != nil {
 			s.t.Error(err)
 			s.t.Fail()
 		}
 
 		return nil
 	})
+}
+
+func (s *ProxyStage) pact_verification_is_successful() *ProxyStage {
+	if s.pactResult != nil {
+		s.t.Error(s.pactResult)
+		s.t.Fail()
+	}
+	return s
+}
+
+func (s *ProxyStage) pact_verification_is_not_successful() *ProxyStage {
+	if s.pactResult == nil {
+		s.t.Error("pact verification did not fail")
+		s.t.Fail()
+	}
+	return s
 }
 
 func (s *ProxyStage) the_proxy_waits_for_all_requests() *ProxyStage {
@@ -418,62 +369,6 @@ func (s *ProxyStage) the_proxy_waits_for_all_requests() *ProxyStage {
 		s.t.Errorf("proxy did not wait for requests, sent=%d expected=%d", sent, s.requestsToSend)
 		s.t.Fail()
 	}
-	return s
-}
-
-func (s *ProxyStage) requests_for_names_and_addresse_are_sent() *ProxyStage {
-	s.pactResult = s.pact.Verify(func() (err error) {
-		s.requestsToSend = 2
-		atomic.StoreInt32(&s.requestsSent, 0)
-		go func() {
-			u := fmt.Sprintf("http://localhost:%s/users", proxyURL.Port())
-			req, err := http.NewRequest("POST", u, strings.NewReader(`{"name":"test"}`))
-			if err != nil {
-				s.t.Error(err)
-				s.t.Fail()
-			}
-
-			req.Header.Set("Content-Type", "application/json")
-			atomic.AddInt32(&s.requestsSent, 1)
-			if _, err = http.DefaultClient.Do(req); err != nil {
-				s.t.Error(err)
-				s.t.Fail()
-			}
-		}()
-
-		go func() {
-			u := fmt.Sprintf("http://localhost:%s/addresses", proxyURL.Port())
-			req, err := http.NewRequest("POST", u, strings.NewReader(`{"address":"test"}`))
-			if err != nil {
-				s.t.Error(err)
-				s.t.Fail()
-			}
-
-			req.Header.Set("Content-Type", "application/json")
-			atomic.AddInt32(&s.requestsSent, 1)
-			if _, err = http.DefaultClient.Do(req); err != nil {
-				s.t.Error(err)
-				s.t.Fail()
-			}
-		}()
-
-		if err := s.proxy.WaitForAll(); err != nil {
-			s.t.Error(err)
-			s.t.Fail()
-		}
-
-		return nil
-	})
-	return s
-}
-
-func (s *ProxyStage) a_modified_response_status_of_(statusCode int) *ProxyStage {
-	s.modifiedStatusCode = statusCode
-	return s
-}
-
-func (s *ProxyStage) a_modified_response_body_of_(path, value string) *ProxyStage {
-	s.modifiedBody[path] = value
 	return s
 }
 
@@ -487,10 +382,6 @@ func (s *ProxyStage) the_response_name_is_(name string) *ProxyStage {
 	s.the_nth_response_name_is_(1, name)
 
 	return s
-}
-
-func (s *ProxyStage) a_modified_response_attempt_of(i int) {
-	s.modifiedAttempt = &i
 }
 
 func (s *ProxyStage) the_nth_response_is_(n, statusCode int) *ProxyStage {

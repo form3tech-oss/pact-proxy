@@ -3,7 +3,6 @@ package app
 import (
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -12,6 +11,11 @@ import (
 	"github.com/form3tech-oss/pact-proxy/pkg/pactproxy"
 	"github.com/pact-foundation/pact-go/dsl"
 	log "github.com/sirupsen/logrus"
+)
+
+const (
+	postAddressPact         = "A request to create an address"
+	postNamePactWithAnyName = "A request to create a user with any name"
 )
 
 type ConcurrentProxyStage struct {
@@ -29,26 +33,12 @@ type ConcurrentProxyStage struct {
 }
 
 func NewConcurrentProxyStage(t *testing.T) (*ConcurrentProxyStage, *ConcurrentProxyStage, *ConcurrentProxyStage) {
-	pact := &dsl.Pact{
-		Consumer: "MyConsumer",
-		Provider: "MyProvider",
-		Host:     "localhost",
-	}
-
-	pact.Setup(true)
-	proxy, err := pactproxy.
-		Configuration(adminURL.String()).
-		SetupProxy(proxyURL.String(), fmt.Sprintf("http://%s:%d", pact.Host, pact.Server.Port))
+	proxy, err := setupAndWaitForProxy()
 	if err != nil {
 		t.Logf("Error setting up proxy: %v", err)
 		t.Fail()
 	}
 
-	pact.Server.Port, err = strconv.Atoi(proxyURL.Port())
-	if err != nil {
-		t.Logf("Error parsing server port: %v", err)
-		t.Fail()
-	}
 	s := &ConcurrentProxyStage{
 		t:     t,
 		pact:  pact,
@@ -57,7 +47,6 @@ func NewConcurrentProxyStage(t *testing.T) (*ConcurrentProxyStage, *ConcurrentPr
 
 	t.Cleanup(func() {
 		pactproxy.Configuration(adminURL.String()).Reset()
-		pact.Teardown()
 	})
 
 	return s, s, s
@@ -80,7 +69,7 @@ func (s *ConcurrentProxyStage) a_modified_address_status_code() *ConcurrentProxy
 func (s *ConcurrentProxyStage) a_pact_that_allows_any_names() *ConcurrentProxyStage {
 	s.pact.
 		AddInteraction().
-		UponReceiving(postNamePact).
+		UponReceiving(postNamePactWithAnyName).
 		WithRequest(dsl.Request{
 			Method:  "POST",
 			Path:    dsl.String("/users"),
@@ -129,8 +118,12 @@ func (s *ConcurrentProxyStage) x_concurrent_address_requests_per_second_are_made
 
 func (s *ConcurrentProxyStage) the_concurrent_requests_are_sent() {
 	err := s.pact.Verify(func() (err error) {
-		s.proxy.ForInteraction(postNamePact).AddModifier("$.status", fmt.Sprintf("%d", s.modifiedNameStatusCode), nil)
-		s.proxy.ForInteraction(postAddressPact).AddModifier("$.status", fmt.Sprintf("%d", s.modifiedAddressStatusCode), nil)
+		if s.modifiedNameStatusCode != 0 {
+			s.proxy.ForInteraction(postNamePactWithAnyName).AddModifier("$.status", fmt.Sprintf("%d", s.modifiedNameStatusCode), nil)
+		}
+		if s.modifiedAddressStatusCode != 0 {
+			s.proxy.ForInteraction(postAddressPact).AddModifier("$.status", fmt.Sprintf("%d", s.modifiedAddressStatusCode), nil)
+		}
 
 		wg := sync.WaitGroup{}
 
@@ -236,6 +229,28 @@ func (s *ConcurrentProxyStage) all_the_address_responses_should_have_the_right_s
 		if s.modifiedAddressStatusCode != res.StatusCode {
 			s.t.Errorf("expected address status code of %d, but got %d", s.modifiedAddressStatusCode, res.StatusCode)
 		}
+	}
+
+	return s
+}
+
+func (s *ConcurrentProxyStage) the_proxy_waits_for_all_user_responses() *ConcurrentProxyStage {
+	want := s.concurrentUserRequestsPerSecond * int(s.concurrentUserRequestsDuration/time.Second)
+	received := len(s.userResponses)
+	if received != want {
+		s.t.Errorf("expected %d user responses, but got %d", want, received)
+		s.t.Fail()
+	}
+
+	return s
+}
+
+func (s *ConcurrentProxyStage) the_proxy_waits_for_all_address_responses() *ConcurrentProxyStage {
+	want := s.concurrentAddressRequestsPerSecond * int(s.concurrentAddressRequestsDuration/time.Second)
+	received := len(s.addressResponses)
+	if received != want {
+		s.t.Errorf("expected %d address responses, but got %d", want, received)
+		s.t.Fail()
 	}
 
 	return s

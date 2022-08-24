@@ -3,6 +3,7 @@ package app
 import (
 	"bytes"
 	"fmt"
+	"github.com/pact-foundation/pact-go/dsl"
 	"net/url"
 	"os"
 	"os/exec"
@@ -16,33 +17,12 @@ import (
 )
 
 var (
-	pathOnce sync.Once
-	adminURL *url.URL
-	proxyURL *url.URL
+	pathOnce               sync.Once
+	adminURL               *url.URL
+	proxyURL               *url.URL
+	pact                   *dsl.Pact
+	originalPactServerPort int
 )
-
-func getTopLevelDir() (string, error) {
-	gitCommand := exec.Command("git", "rev-parse", "--show-toplevel")
-	var out bytes.Buffer
-	gitCommand.Stdout = &out
-	if err := gitCommand.Run(); err != nil {
-		return "", err
-	}
-
-	topLevelDir := strings.TrimRight(out.String(), "\n")
-	return topLevelDir, nil
-}
-
-func setPathOnce() {
-	pathOnce.Do(func() {
-		topLevelDir, err := getTopLevelDir()
-		if err != nil {
-			panic(err)
-		}
-		pactPath := filepath.Join(topLevelDir, "pact/bin")
-		os.Setenv("PATH", pactPath+":"+os.Getenv("PATH"))
-	})
-}
 
 func TestMain(m *testing.M) {
 	setPathOnce()
@@ -69,5 +49,45 @@ func TestMain(m *testing.M) {
 		panic(err)
 	}
 
+	teardown := startPactServer(proxyPort)
+	defer teardown()
+
 	m.Run()
+}
+
+func getTopLevelDir() (string, error) {
+	gitCommand := exec.Command("git", "rev-parse", "--show-toplevel")
+	var out bytes.Buffer
+	gitCommand.Stdout = &out
+	if err := gitCommand.Run(); err != nil {
+		return "", err
+	}
+
+	topLevelDir := strings.TrimRight(out.String(), "\n")
+	return topLevelDir, nil
+}
+
+func setPathOnce() {
+	pathOnce.Do(func() {
+		topLevelDir, err := getTopLevelDir()
+		if err != nil {
+			panic(err)
+		}
+		pactPath := filepath.Join(topLevelDir, "pact/bin")
+		os.Setenv("PATH", pactPath+":"+os.Getenv("PATH"))
+	})
+}
+
+func startPactServer(overridePort int) func() *dsl.Pact {
+	pact = &dsl.Pact{
+		Consumer: "MyConsumer",
+		Provider: "MyProvider",
+		Host:     "localhost",
+	}
+
+	pact.Setup(true)
+	originalPactServerPort = pact.Server.Port
+	pact.Server.Port = overridePort
+
+	return pact.Teardown
 }
