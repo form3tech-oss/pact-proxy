@@ -24,20 +24,19 @@ func TestConcurrentRequestsForDifferentModifiersHaveTheCorrectResponses(t *testi
 		all_the_address_responses_should_have_the_right_status_code()
 }
 
-// TODO implement this boy
-//func TestConcurrentRequestsWaitForAllPacts(t *testing.T) {
-//	given, when, then := NewConcurrentProxyStage(t)
-//
-//	given.
-//		a_pact_that_allows_any_names().and().
-//		a_pact_that_allows_any_address()
-//
-//	when.
-//		x_concurrent_user_requests_per_second_are_made_for_y_seconds(5, 5*time.Second).and().
-//		x_concurrent_address_requests_per_second_are_made_for_y_seconds(5, 5*time.Second).and().
-//		the_concurrent_requests_are_sent()
-//
-//	then.
-//		pact_verification_is_successful().and().
-//		the_proxy_waits_for_all_requests()
-//}
+func TestConcurrentRequestsWaitForAllPacts(t *testing.T) {
+	given, when, then := NewConcurrentProxyStage(t)
+
+	given.
+		a_pact_that_allows_any_names().and().
+		a_pact_that_allows_any_address()
+
+	when.
+		x_concurrent_user_requests_per_second_are_made_for_y_seconds(5, 5*time.Second).and().
+		x_concurrent_address_requests_per_second_are_made_for_y_seconds(5, 5*time.Second).and().
+		the_concurrent_requests_are_sent()
+
+	then.
+		the_proxy_waits_for_all_user_responses().and().
+		the_proxy_waits_for_all_address_responses()
+}
