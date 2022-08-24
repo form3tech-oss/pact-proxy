@@ -13,6 +13,11 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+const (
+	postAddressPact         = "A request to create an address"
+	postNamePactWithAnyName = "A request to create a user with any name"
+)
+
 type ConcurrentProxyStage struct {
 	t                                  *testing.T
 	proxy                              *pactproxy.PactProxy

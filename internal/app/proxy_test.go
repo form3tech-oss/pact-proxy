@@ -9,40 +9,40 @@ func TestLargePactResponse(t *testing.T) {
 	given, when, then := NewProxyStage(t)
 
 	given.
-		a_pact_for_large_string_generation()
+		a_pact_that_allows_any_names_and_returns_large_body_and_any_name()
 
 	when.
-		a_request_is_sent_to_generate_large_string()
+		a_request_is_sent_using_the_name("jane")
 
 	then.
 		pact_verification_is_successful().and().
-		the_nth_response_body_has_(1, "generated", largeString)
+		the_nth_response_body_has_(1, "large_string", largeString)
 }
 
 func TestLargePactResponseWithModifiedBody(t *testing.T) {
 	given, when, then := NewProxyStage(t)
 
 	given.
-		a_pact_for_large_string_generation().and().
-		a_modified_response_body_of_("$.body.name", "jane")
+		a_pact_that_allows_any_names_and_returns_large_body_and_any_name().and().
+		a_modified_response_body_of_("$.body.name", "custom_name")
 
 	when.
-		n_requests_are_sent_with_modifiers_using_the_body(1, `{"string":"large"}`)
+		a_request_is_sent_using_the_name("jane")
 
 	then.
 		pact_verification_is_successful().and().
-		the_response_name_is_("jane").and()
+		the_response_name_is_("custom_name").and()
 }
 
 func TestLargePactResponseWithModifiedStatusCode(t *testing.T) {
 	given, when, then := NewProxyStage(t)
 
 	given.
-		a_pact_for_large_string_generation().and().
+		a_pact_that_allows_any_names_and_returns_large_body_and_any_name().and().
 		a_modified_response_status_of_(http.StatusInternalServerError)
 
 	when.
-		n_requests_are_sent_with_modifiers_using_the_body(1, `{"string":"large"}`)
+		a_request_is_sent_using_the_name("jane")
 
 	then.
 		pact_verification_is_successful().and().
@@ -53,10 +53,10 @@ func TestConstraintMatches(t *testing.T) {
 	given, when, then := NewProxyStage(t)
 
 	given.
-		a_pact_that_allows_any_names()
+		a_pact_that_allows_any_names().and().
+		a_name_constraint_is_added("sam")
 
 	when.
-		a_constraint_is_added("sam").and().
 		a_request_is_sent_using_the_name("sam")
 
 	then.
@@ -71,7 +71,7 @@ func TestConstraintDoesntMatch(t *testing.T) {
 		a_pact_that_allows_any_names()
 
 	when.
-		a_constraint_is_added("sam").and().
+		a_name_constraint_is_added("sam").and().
 		a_request_is_sent_using_the_name("bob")
 
 	then.
@@ -92,21 +92,6 @@ func TestWaitForPact(t *testing.T) {
 		the_proxy_waits_for_all_requests()
 }
 
-func TestWaitForAllPacts(t *testing.T) {
-	given, when, then := NewProxyStage(t)
-
-	given.
-		a_pact_that_allows_any_names().and().
-		a_pact_that_allows_any_address()
-
-	when.
-		requests_for_names_and_addresse_are_sent()
-
-	then.
-		pact_verification_is_successful().and().
-		the_proxy_waits_for_all_requests()
-}
-
 func TestModifiedStatusCode(t *testing.T) {
 	given, when, then := NewProxyStage(t)
 
@@ -115,7 +100,7 @@ func TestModifiedStatusCode(t *testing.T) {
 		a_modified_response_status_of_(http.StatusInternalServerError)
 
 	when.
-		a_request_is_sent_with_modifiers_using_the_name("sam")
+		a_request_is_sent_using_the_name("sam")
 
 	then.
 		pact_verification_is_successful().and().
@@ -126,11 +111,11 @@ func TestModifiedStatusCodeOnARequestWithoutBody(t *testing.T) {
 	given, when, then := NewProxyStage(t)
 
 	given.
-		a_pact_that_returns_no_body().and().
+		a_pact_that_allows_any_names_and_returns_no_body().and().
 		a_modified_response_status_of_(http.StatusInternalServerError)
 
 	when.
-		a_request_is_sent_with_modifiers_using_the_name("sam")
+		a_request_is_sent_using_the_name("sam")
 
 	then.
 		pact_verification_is_successful().and().
@@ -145,7 +130,7 @@ func TestModifiedBody(t *testing.T) {
 		a_modified_response_body_of_("$.body.name", "jane")
 
 	when.
-		a_request_is_sent_with_modifiers_using_the_name("sam")
+		a_request_is_sent_using_the_name("sam")
 
 	then.
 		pact_verification_is_successful().and().
@@ -161,7 +146,7 @@ func TestModifiedStatusCode_ForNRequests(t *testing.T) {
 		a_modified_response_attempt_of(2)
 
 	when.
-		n_requests_are_sent_with_modifiers_using_the_name(3, "sam")
+		n_requests_are_sent_using_the_name(3, "sam")
 
 	then.
 		pact_verification_is_successful().and().
@@ -180,7 +165,7 @@ func TestModifiedBody_ForNRequests(t *testing.T) {
 		a_modified_response_attempt_of(2)
 
 	when.
-		n_requests_are_sent_with_modifiers_using_the_name(3, "sam")
+		n_requests_are_sent_using_the_name(3, "sam")
 
 	then.
 		pact_verification_is_successful().and().
@@ -200,7 +185,7 @@ func TestModifiedBodyWithFirstAndLastName_ForNRequests(t *testing.T) {
 		a_modified_response_attempt_of(2)
 
 	when.
-		n_requests_are_sent_with_modifiers_using_the_body(3, `{"first_name":"sam","last_name":"brown"}`)
+		n_requests_are_sent_using_the_body(3, `{"first_name":"sam","last_name":"brown"}`)
 
 	then.
 		pact_verification_is_successful().and().
@@ -220,7 +205,7 @@ func TestTextPlainContentType(t *testing.T) {
 		a_pact_that_expects_plain_text()
 
 	when.
-		a_request_is_sent_in_plain_text()
+		a_plain_text_request_is_sent()
 
 	then.
 		pact_verification_is_successful().and().
@@ -236,7 +221,7 @@ func TestModifiedStatusCodeWithPlainTextBody(t *testing.T) {
 		a_modified_response_status_of_(http.StatusInternalServerError)
 
 	when.
-		a_request_is_sent_in_plain_text()
+		a_plain_text_request_is_sent()
 
 	then.
 		pact_verification_is_successful().and().
@@ -251,8 +236,8 @@ func TestPlainTextConstraintMatches(t *testing.T) {
 		a_pact_that_expects_plain_text()
 
 	when.
-		a_constraint_is_added("text").and().
-		a_request_is_sent_in_plain_text()
+		a_body_constraint_is_added("text").and().
+		a_plain_text_request_is_sent()
 
 	then.
 		pact_verification_is_successful().and().
@@ -267,7 +252,7 @@ func TestPlainTextDefaultConstraintAdded(t *testing.T) {
 		a_pact_that_expects_plain_text()
 
 	when.
-		a_request_is_sent_in_plain_text_with_body("request with doesn't match constraint")
+		a_plain_text_request_is_sent_with_body("request with doesn't match constraint")
 
 	then.
 		pact_verification_is_not_successful().and().
@@ -281,8 +266,8 @@ func TestPlainTextConstraintDoesNotMatch(t *testing.T) {
 		a_pact_that_expects_plain_text()
 
 	when.
-		a_constraint_is_added("incorrect file content").and().
-		a_request_is_sent_in_plain_text()
+		a_body_constraint_is_added("incorrect file content").and().
+		a_plain_text_request_is_sent()
 
 	then.
 		pact_verification_is_not_successful().and().
@@ -292,20 +277,21 @@ func TestPlainTextConstraintDoesNotMatch(t *testing.T) {
 func TestPlainTextDifferentRequestAndResponseBodies(t *testing.T) {
 	given, when, then := NewProxyStage(t)
 
+	reqBody := "request body"
+	respBody := "response body"
 	requestConstraint := "request body"
 
 	given.
-		// TODO fix this test to have dynamic params
-		a_pact_that_expects_plain_text_with_different_request_response()
+		a_pact_that_expects_plain_text_with_request_response(reqBody, respBody)
 
 	when.
-		a_constraint_is_added(requestConstraint).and().
-		a_request_is_sent_in_plain_text_with_body("request body")
+		a_body_constraint_is_added(requestConstraint).and().
+		a_plain_text_request_is_sent_with_body("request body")
 
 	then.
 		pact_verification_is_successful().and().
 		the_response_is_(http.StatusOK).and().
-		the_response_body_is([]byte("response body"))
+		the_response_body_is([]byte(respBody))
 }
 
 func TestIncorrectContentTypes(t *testing.T) {
@@ -320,7 +306,7 @@ func TestIncorrectContentTypes(t *testing.T) {
 				a_pact_that_expects_plain_text()
 
 			when.
-				a_request_is_sent_with_body_and_content_type("req body", contentType)
+				n_requests_are_sent_using_the_body_and_content_type(1, "req body", contentType)
 
 			then.
 				pact_verification_is_not_successful().and().
@@ -336,7 +322,7 @@ func TestEmptyContentTypeDefaultsToPlainText(t *testing.T) {
 		a_pact_that_expects_plain_text_without_request_content_type_header()
 
 	when.
-		a_request_is_sent_with_body_and_content_type("text", "")
+		n_requests_are_sent_using_the_body_and_content_type(1, "text", "")
 
 	then.
 		pact_verification_is_successful().and().
