@@ -5,8 +5,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/avast/retry-go/v4"
 	"github.com/form3tech-oss/pact-proxy/pkg/pactproxy"
 	"github.com/pact-foundation/pact-go/dsl"
+	"github.com/pkg/errors"
 	"io"
 	"net/http"
 	"strconv"
@@ -36,9 +38,7 @@ type ProxyStage struct {
 var largeString = strings.Repeat("long_string123BBmmF8BYezrBhCROOCRJfeH5k69hMKXH77TSvwF5GHUZFnbh1dsZ3d90HeR0jUIOovJJVS508uI17djeLFFSb7", 440)
 
 func NewProxyStage(t *testing.T) (*ProxyStage, *ProxyStage, *ProxyStage) {
-	proxy, err := pactproxy.
-		Configuration(adminURL.String()).
-		SetupProxy(proxyURL.String(), fmt.Sprintf("http://%s:%d", pact.Host, originalPactServerPort))
+	proxy, err := setupAndWaitForProxy()
 	if err != nil {
 		t.Logf("Error setting up proxy: %v", err)
 		t.Fail()
@@ -57,6 +57,28 @@ func NewProxyStage(t *testing.T) (*ProxyStage, *ProxyStage, *ProxyStage) {
 	})
 
 	return s, s, s
+}
+
+func setupAndWaitForProxy() (*pactproxy.PactProxy, error) {
+	proxy, err := pactproxy.
+		Configuration(adminURL.String()).
+		SetupProxy(proxyURL.String(), fmt.Sprintf("http://%s:%d", pact.Host, originalPactServerPort))
+	if err != nil {
+		return nil, errors.Wrap(err, "proxy setup failed")
+	}
+
+	retryOpts := []retry.Option{
+		retry.Attempts(10),
+		retry.DelayType(retry.FixedDelay),
+		retry.Delay(500 * time.Millisecond),
+	}
+
+	err = retry.Do(proxy.IsReady, retryOpts...)
+	if err != nil {
+		return nil, errors.Wrap(err, "proxy readiness wait failed")
+	}
+
+	return proxy, nil
 }
 
 func (s *ProxyStage) and() *ProxyStage {

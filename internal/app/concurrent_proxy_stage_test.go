@@ -33,9 +33,7 @@ type ConcurrentProxyStage struct {
 }
 
 func NewConcurrentProxyStage(t *testing.T) (*ConcurrentProxyStage, *ConcurrentProxyStage, *ConcurrentProxyStage) {
-	proxy, err := pactproxy.
-		Configuration(adminURL.String()).
-		SetupProxy(proxyURL.String(), fmt.Sprintf("http://%s:%d", pact.Host, originalPactServerPort))
+	proxy, err := setupAndWaitForProxy()
 	if err != nil {
 		t.Logf("Error setting up proxy: %v", err)
 		t.Fail()

@@ -36,6 +36,7 @@ func StartProxy(server *http.ServeMux, target *url.URL) {
 	}
 
 	for path, handler := range map[string]func(http.ResponseWriter, *http.Request){
+		"/ready":                     api.readinessHandler,
 		"/interactions/verification": api.proxyPassHandler,
 		"/pact":                      api.proxyPassHandler,
 		"/interactions/constraints":  api.interactionsConstraintsHandler,
@@ -60,6 +61,12 @@ type api struct {
 
 func (a *api) proxyPassHandler(res http.ResponseWriter, req *http.Request) {
 	a.proxy.ServeHTTP(res, req)
+}
+
+func (a *api) readinessHandler(res http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		res.WriteHeader(http.StatusMethodNotAllowed)
+	}
 }
 
 func (a *api) interactionsConstraintsHandler(res http.ResponseWriter, req *http.Request) {
