@@ -24,7 +24,37 @@ var (
 	originalPactServerPort int
 )
 
-//TODO move these private funcs under Main..
+func TestMain(m *testing.M) {
+	setPathOnce()
+	adminPort, err := utils.GetFreePort()
+	if err != nil {
+		panic(err)
+	}
+
+	adminServer := configuration.ServeAdminAPI(adminPort)
+	defer adminServer.Close()
+
+	adminURL, err = url.Parse(fmt.Sprintf("http://localhost:%d", adminPort))
+	if err != nil {
+		panic(err)
+	}
+
+	proxyPort, err := utils.GetFreePort()
+	if err != nil {
+		panic(err)
+	}
+
+	proxyURL, err = url.Parse(fmt.Sprintf("http://localhost:%d", proxyPort))
+	if err != nil {
+		panic(err)
+	}
+
+	teardown := startPactServer(proxyPort)
+	defer teardown()
+
+	m.Run()
+}
+
 func getTopLevelDir() (string, error) {
 	gitCommand := exec.Command("git", "rev-parse", "--show-toplevel")
 	var out bytes.Buffer
@@ -60,35 +90,4 @@ func startPactServer(overridePort int) func() *dsl.Pact {
 	pact.Server.Port = overridePort
 
 	return pact.Teardown
-}
-
-func TestMain(m *testing.M) {
-	setPathOnce()
-	adminPort, err := utils.GetFreePort()
-	if err != nil {
-		panic(err)
-	}
-
-	adminServer := configuration.ServeAdminAPI(adminPort)
-	defer adminServer.Close()
-
-	adminURL, err = url.Parse(fmt.Sprintf("http://localhost:%d", adminPort))
-	if err != nil {
-		panic(err)
-	}
-
-	proxyPort, err := utils.GetFreePort()
-	if err != nil {
-		panic(err)
-	}
-
-	proxyURL, err = url.Parse(fmt.Sprintf("http://localhost:%d", proxyPort))
-	if err != nil {
-		panic(err)
-	}
-
-	teardown := startPactServer(proxyPort)
-	defer teardown()
-
-	m.Run()
 }
