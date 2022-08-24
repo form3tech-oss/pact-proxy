@@ -44,7 +44,7 @@ const (
 
 var largeString = strings.Repeat("long_string123BBmmF8BYezrBhCROOCRJfeH5k69hMKXH77TSvwF5GHUZFnbh1dsZ3d90HeR0jUIOovJJVS508uI17djeLFFSb7", 440)
 
-func NewProxyStage(t *testing.T) (*ProxyStage, *ProxyStage, *ProxyStage, func()) {
+func NewProxyStage(t *testing.T) (*ProxyStage, *ProxyStage, *ProxyStage) {
 	proxy, err := pactproxy.
 		Configuration(adminURL.String()).
 		SetupProxy(proxyURL.String(), fmt.Sprintf("http://%s:%d", pact.Host, originalPactServerPort))
@@ -53,7 +53,7 @@ func NewProxyStage(t *testing.T) (*ProxyStage, *ProxyStage, *ProxyStage, func())
 		t.Fail()
 	}
 
-	stage := &ProxyStage{
+	s := &ProxyStage{
 		t:            t,
 		proxy:        proxy,
 		pact:         pact,
@@ -70,10 +70,11 @@ func NewProxyStage(t *testing.T) (*ProxyStage, *ProxyStage, *ProxyStage, func())
 		},
 	}
 
-	//TODO use t.cleanup instead of returning teardwon func :)
-	return stage, stage, stage, func() {
+	s.t.Cleanup(func() {
 		pactproxy.Configuration(adminURL.String()).Reset()
-	}
+	})
+
+	return s, s, s
 }
 
 func (s *ProxyStage) and() *ProxyStage {

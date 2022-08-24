@@ -6,8 +6,7 @@ import (
 )
 
 func TestLargePactResponse(t *testing.T) {
-	given, when, then, teardown := NewProxyStage(t)
-	defer teardown()
+	given, when, then := NewProxyStage(t)
 
 	given.
 		a_pact_for_large_string_generation()
@@ -21,8 +20,7 @@ func TestLargePactResponse(t *testing.T) {
 }
 
 func TestLargePactResponseWithModifiedBody(t *testing.T) {
-	given, when, then, teardown := NewProxyStage(t)
-	defer teardown()
+	given, when, then := NewProxyStage(t)
 
 	given.
 		a_pact_for_large_string_generation().and().
@@ -37,8 +35,7 @@ func TestLargePactResponseWithModifiedBody(t *testing.T) {
 }
 
 func TestLargePactResponseWithModifiedStatusCode(t *testing.T) {
-	given, when, then, teardown := NewProxyStage(t)
-	defer teardown()
+	given, when, then := NewProxyStage(t)
 
 	given.
 		a_pact_for_large_string_generation().and().
@@ -53,8 +50,7 @@ func TestLargePactResponseWithModifiedStatusCode(t *testing.T) {
 }
 
 func TestConstraintMatches(t *testing.T) {
-	given, when, then, teardown := NewProxyStage(t)
-	defer teardown()
+	given, when, then := NewProxyStage(t)
 
 	given.
 		a_pact_that_allows_any_names()
@@ -69,8 +65,7 @@ func TestConstraintMatches(t *testing.T) {
 }
 
 func TestConstraintDoesntMatch(t *testing.T) {
-	given, when, then, teardown := NewProxyStage(t)
-	defer teardown()
+	given, when, then := NewProxyStage(t)
 
 	given.
 		a_pact_that_allows_any_names()
@@ -84,8 +79,7 @@ func TestConstraintDoesntMatch(t *testing.T) {
 }
 
 func TestWaitForPact(t *testing.T) {
-	given, when, then, teardown := NewProxyStage(t)
-	defer teardown()
+	given, when, then := NewProxyStage(t)
 
 	given.
 		a_pact_that_allows_any_names()
@@ -99,8 +93,7 @@ func TestWaitForPact(t *testing.T) {
 }
 
 func TestWaitForAllPacts(t *testing.T) {
-	given, when, then, teardown := NewProxyStage(t)
-	defer teardown()
+	given, when, then := NewProxyStage(t)
 
 	given.
 		a_pact_that_allows_any_names().and().
@@ -115,8 +108,7 @@ func TestWaitForAllPacts(t *testing.T) {
 }
 
 func TestModifiedStatusCode(t *testing.T) {
-	given, when, then, teardown := NewProxyStage(t)
-	defer teardown()
+	given, when, then := NewProxyStage(t)
 
 	given.
 		a_pact_that_allows_any_names().and().
@@ -131,8 +123,7 @@ func TestModifiedStatusCode(t *testing.T) {
 }
 
 func TestModifiedStatusCodeOnARequestWithoutBody(t *testing.T) {
-	given, when, then, teardown := NewProxyStage(t)
-	defer teardown()
+	given, when, then := NewProxyStage(t)
 
 	given.
 		a_pact_that_returns_no_body().and().
@@ -147,8 +138,7 @@ func TestModifiedStatusCodeOnARequestWithoutBody(t *testing.T) {
 }
 
 func TestModifiedBody(t *testing.T) {
-	given, when, then, teardown := NewProxyStage(t)
-	defer teardown()
+	given, when, then := NewProxyStage(t)
 
 	given.
 		a_pact_that_allows_any_names().and().
@@ -163,8 +153,7 @@ func TestModifiedBody(t *testing.T) {
 }
 
 func TestModifiedStatusCode_ForNRequests(t *testing.T) {
-	given, when, then, teardown := NewProxyStage(t)
-	defer teardown()
+	given, when, then := NewProxyStage(t)
 
 	given.
 		a_pact_that_allows_any_names().and().
@@ -183,8 +172,7 @@ func TestModifiedStatusCode_ForNRequests(t *testing.T) {
 }
 
 func TestModifiedBody_ForNRequests(t *testing.T) {
-	given, when, then, teardown := NewProxyStage(t)
-	defer teardown()
+	given, when, then := NewProxyStage(t)
 
 	given.
 		a_pact_that_allows_any_names().and().
@@ -203,8 +191,7 @@ func TestModifiedBody_ForNRequests(t *testing.T) {
 }
 
 func TestModifiedBodyWithFirstAndLastName_ForNRequests(t *testing.T) {
-	given, when, then, teardown := NewProxyStage(t)
-	defer teardown()
+	given, when, then := NewProxyStage(t)
 
 	given.
 		a_pact_that_allows_any_first_and_last_names().and().
@@ -227,8 +214,7 @@ func TestModifiedBodyWithFirstAndLastName_ForNRequests(t *testing.T) {
 }
 
 func TestTextPlainContentType(t *testing.T) {
-	given, when, then, teardown := NewProxyStage(t)
-	defer teardown()
+	given, when, then := NewProxyStage(t)
 
 	given.
 		a_pact_that_expects_plain_text()
@@ -243,8 +229,7 @@ func TestTextPlainContentType(t *testing.T) {
 }
 
 func TestModifiedStatusCodeWithPlainTextBody(t *testing.T) {
-	given, when, then, teardown := NewProxyStage(t)
-	defer teardown()
+	given, when, then := NewProxyStage(t)
 
 	given.
 		a_pact_that_expects_plain_text().and().
@@ -260,8 +245,7 @@ func TestModifiedStatusCodeWithPlainTextBody(t *testing.T) {
 }
 
 func TestPlainTextConstraintMatches(t *testing.T) {
-	given, when, then, teardown := NewProxyStage(t)
-	defer teardown()
+	given, when, then := NewProxyStage(t)
 
 	given.
 		a_pact_that_expects_plain_text()
@@ -277,8 +261,7 @@ func TestPlainTextConstraintMatches(t *testing.T) {
 }
 
 func TestPlainTextDefaultConstraintAdded(t *testing.T) {
-	given, when, then, teardown := NewProxyStage(t)
-	defer teardown()
+	given, when, then := NewProxyStage(t)
 
 	given.
 		a_pact_that_expects_plain_text()
@@ -292,8 +275,7 @@ func TestPlainTextDefaultConstraintAdded(t *testing.T) {
 }
 
 func TestPlainTextConstraintDoesNotMatch(t *testing.T) {
-	given, when, then, teardown := NewProxyStage(t)
-	defer teardown()
+	given, when, then := NewProxyStage(t)
 
 	given.
 		a_pact_that_expects_plain_text()
@@ -308,8 +290,7 @@ func TestPlainTextConstraintDoesNotMatch(t *testing.T) {
 }
 
 func TestPlainTextDifferentRequestAndResponseBodies(t *testing.T) {
-	given, when, then, teardown := NewProxyStage(t)
-	defer teardown()
+	given, when, then := NewProxyStage(t)
 
 	requestConstraint := "request body"
 
@@ -333,8 +314,7 @@ func TestIncorrectContentTypes(t *testing.T) {
 		"invalid format": http.StatusBadRequest,
 	} {
 		t.Run(contentType, func(t *testing.T) {
-			given, when, then, teardown := NewProxyStage(t)
-			defer teardown()
+			given, when, then := NewProxyStage(t)
 
 			given.
 				a_pact_that_expects_plain_text()
@@ -350,8 +330,7 @@ func TestIncorrectContentTypes(t *testing.T) {
 }
 
 func TestEmptyContentTypeDefaultsToPlainText(t *testing.T) {
-	given, when, then, teardown := NewProxyStage(t)
-	defer teardown()
+	given, when, then := NewProxyStage(t)
 
 	given.
 		a_pact_that_expects_plain_text_without_request_content_type_header()
