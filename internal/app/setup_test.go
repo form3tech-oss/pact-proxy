@@ -80,9 +80,10 @@ func setPathOnce() {
 
 func startPactServer(overridePort int) func() *dsl.Pact {
 	pact = &dsl.Pact{
-		Consumer: "MyConsumer",
-		Provider: "MyProvider",
-		Host:     "localhost",
+		Consumer:             "MyConsumer",
+		Provider:             "MyProvider",
+		Host:                 "localhost",
+		SpecificationVersion: 3,
 	}
 
 	pact.Setup(true)
