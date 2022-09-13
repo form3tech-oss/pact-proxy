@@ -119,6 +119,75 @@ func TestLoadInteractionPlainTextConstraints(t *testing.T) {
 	}
 }
 
+// This test asserts that given a pact v3-style nested matching rule, a constraint
+// is not created for the corresponding property
+func TestV3MatchingRulesLeadToCorrectConstraints(t *testing.T) {
+	v3matchingRulePresent :=
+		`{
+		"description": "A request to admit a payment",
+		"request": {
+		  "method": "POST",
+		  "path": "/v1/payments/830e5d93-1cd1-4def-953e-6188d7235c38/admissions",
+		  "headers": {
+			"Content-Type": "application/json; charset=utf-8"
+		  },
+		  "body": {
+		    "data": {
+		      "type": "payment_admissions"
+		    }
+		  },
+		  "matchingRules": {
+			"body": {
+              "$.data.type" :{
+                "matchers" : [
+                  { "match": "regex", "regex": "[a-zA-z]*" }
+                ]
+              }
+		    }
+		  }
+		},
+		"response": {
+		  "status": 200,
+		  "headers": {
+			"Content-Type": "application/json"
+		  },
+		  "body": {
+		    "data": {
+		      "type": "payment_admissions"
+		    }
+		  }
+		}
+	  }`
+	tests := []struct {
+		name           string
+		interaction    []byte
+		wantConstraint interactionConstraint
+		wantErr        bool
+	}{
+		{
+			name:           "v3 matching rule present - no constraint created for body.data.type",
+			interaction:    []byte(v3matchingRulePresent),
+			wantConstraint: interactionConstraint{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := LoadInteraction(tt.interaction, "alias")
+
+			require.Equalf(t, tt.wantErr, err != nil, "error %v", err)
+
+			var gotConstraint interactionConstraint
+			got.constraints.Range(func(key, value interface{}) bool {
+				var present bool
+				gotConstraint, present = value.(interactionConstraint)
+				return present
+			})
+
+			assert.EqualValues(t, tt.wantConstraint, gotConstraint)
+		})
+	}
+}
+
 func Test_parseMediaType(t *testing.T) {
 	tests := []struct {
 		name    string
