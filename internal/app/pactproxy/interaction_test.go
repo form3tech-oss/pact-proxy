@@ -140,7 +140,7 @@ func TestV3MatchingRulesLeadToCorrectConstraints(t *testing.T) {
 			"body": {
               "$.data.type" :{
                 "matchers" : [
-                  { "match": "regex", "regex": "[a-zA-z]*" }
+                  { "match": "regex", "regex": ".*" }
                 ]
               }
 		    }
@@ -158,6 +158,53 @@ func TestV3MatchingRulesLeadToCorrectConstraints(t *testing.T) {
 		  }
 		}
 	  }`
+
+	multiplev3matchingRulesPresent :=
+		`{
+		"description": "A request to admit a payment",
+		"request": {
+		  "method": "POST",
+		  "path": "/v1/payments/830e5d93-1cd1-4def-953e-6188d7235c38/admissions",
+		  "headers": {
+			"Content-Type": "application/json; charset=utf-8"
+		  },
+		  "body": {
+		    "data": {
+		      "type": "payment_admissions",
+              "attributes": {
+                "status": "failed",
+                "status_reason": "unknown_accountnumber"
+			  }
+		    }
+		  },
+		  "matchingRules": {
+			"body": {
+              "$.data.type" :{
+                "matchers" : [
+                  { "match": "regex", "regex": ".*" }
+                ]
+			  },
+              "$.data.attributes.status_reason" :{
+			    "matchers" : [
+			      { "match": "regex", "regex": "(unknown_accountnumber|account_closed|invalid_beneficiary_details)" }
+			    ]
+              }
+		    }
+		  }
+		},
+		"response": {
+		  "status": 200,
+		  "headers": {
+			"Content-Type": "application/json"
+		  },
+		  "body": {
+		    "data": {
+		      "type": "payment_admissions"
+		    }
+		  }
+		}
+	  }`
+
 	tests := []struct {
 		name           string
 		interaction    []byte
@@ -168,6 +215,15 @@ func TestV3MatchingRulesLeadToCorrectConstraints(t *testing.T) {
 			name:           "v3 matching rule present - no constraint created for body.data.type",
 			interaction:    []byte(v3matchingRulePresent),
 			wantConstraint: interactionConstraint{},
+		},
+		{
+			name:        "multiple v3 matching rules present - no constraint created for body properties with matching rule",
+			interaction: []byte(multiplev3matchingRulesPresent),
+			wantConstraint: interactionConstraint{
+				Path:   "$.body.data.attributes.status",
+				Format: "%v",
+				Values: []interface{}{"failed"},
+			},
 		},
 	}
 	for _, tt := range tests {

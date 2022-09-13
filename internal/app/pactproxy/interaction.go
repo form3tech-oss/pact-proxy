@@ -6,6 +6,7 @@ import (
 	"mime"
 	"reflect"
 	"regexp"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -71,12 +72,9 @@ func LoadInteraction(data []byte, alias string) (*interaction, error) {
 
 	var matcher pathMatcher = &stringPathMatcher{val: request["path"].(string)}
 
-	matchingRules, hasRules := request["matchingRules"]
-	if !hasRules {
-		matchingRules = make(map[string]interface{})
-	}
+	matchingRules := getMatchingRules(request)
 
-	if pathRule, hasPathRule := matchingRules.(map[string]interface{})["$.path"]; hasPathRule {
+	if pathRule, hasPathRule := matchingRules["$.path"]; hasPathRule {
 		regexRule := pathRule.(map[string]interface{})["regex"].(string)
 		regex, err := regexp.Compile("^" + regexRule + "$")
 		if err != nil {
@@ -112,18 +110,53 @@ func LoadInteraction(data []byte, alias string) (*interaction, error) {
 	switch mediaType {
 	case mediaTypeJSON:
 		if jsonRequestBody, ok := requestBody.(map[string]interface{}); ok {
-			interaction.addJSONConstraintsFromPact("$.body", matchingRules.(map[string]interface{}), jsonRequestBody)
+			interaction.addJSONConstraintsFromPact("$.body", matchingRules, jsonRequestBody)
 			return interaction, nil
 		}
 		return nil, fmt.Errorf("media type is %s but body is not json", mediaType)
 	case mediaTypeText:
 		if plainTextRequestBody, ok := requestBody.(string); ok {
-			interaction.addTextConstraintsFromPact(matchingRules.(map[string]interface{}), plainTextRequestBody)
+			interaction.addTextConstraintsFromPact(matchingRules, plainTextRequestBody)
 			return interaction, nil
 		}
 		return nil, fmt.Errorf("media type is %s but body is not text", mediaType)
 	}
 	return nil, fmt.Errorf("unsupported media type %s", mediaType)
+}
+
+func getMatchingRules(request map[string]interface{}) map[string]interface{} {
+	rules, hasRules := request["matchingRules"]
+	if !hasRules {
+		rules = make(map[string]interface{})
+	}
+	rulesMap := rules.(map[string]interface{})
+
+	// flatten the matching rules
+	flattenedRulesMap := make(map[string]interface{})
+	flattenRulesMap("$", rulesMap, flattenedRulesMap)
+
+	return flattenedRulesMap
+}
+
+// Flattens a map with nested rules; stops when it finds a "matchers" or "regex" entry
+func flattenRulesMap(path string, mapToFlatten map[string]interface{}, outputMap map[string]interface{}) {
+	if outputMap == nil {
+		outputMap = make(map[string]interface{})
+	}
+
+	for k, v := range mapToFlatten {
+		k := strings.TrimPrefix(k, "$.")
+		if k == "matchers" || k == "regex" {
+			outputMap[path] = v
+		} else {
+			switch val := v.(type) {
+			case map[string]interface{}:
+				flattenRulesMap(path+"."+k, val, outputMap)
+			default:
+				outputMap[path+"."+k] = v
+			}
+		}
+	}
 }
 
 func parseMediaType(request map[string]interface{}) (string, error) {
