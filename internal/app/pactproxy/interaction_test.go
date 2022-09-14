@@ -126,7 +126,7 @@ func TestV3MatchingRulesLeadToCorrectConstraints(t *testing.T) {
 		`{
 		"description": "A request to admit a payment",
 		"request": {
-		  "method": "POST",
+		  "method": "POST",	
 		  "path": "/v1/payments/830e5d93-1cd1-4def-953e-6188d7235c38/admissions",
 		  "headers": {
 			"Content-Type": "application/json; charset=utf-8"
@@ -137,6 +137,11 @@ func TestV3MatchingRulesLeadToCorrectConstraints(t *testing.T) {
 		    }
 		  },
 		  "matchingRules": {
+            "path": {
+              "matchers" : [
+                { "match": "regex", "regex": "/v1/payments/[0-9A-Fa-f]{8}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{12}/admissions" }
+              ]
+            },
 			"body": {
               "$.data.type" :{
                 "matchers" : [
@@ -178,6 +183,11 @@ func TestV3MatchingRulesLeadToCorrectConstraints(t *testing.T) {
 		    }
 		  },
 		  "matchingRules": {
+            "path": {
+              "matchers" : [
+                { "match": "regex", "regex": "/v1/payments/[0-9A-Fa-f]{8}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{4}[-][0-9A-Fa-f]{12}/admissions" }
+              ]
+            },
 			"body": {
               "$.data.type" :{
                 "matchers" : [

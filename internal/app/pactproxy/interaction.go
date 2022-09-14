@@ -73,16 +73,17 @@ func LoadInteraction(data []byte, alias string) (*interaction, error) {
 	var matcher pathMatcher = &stringPathMatcher{val: request["path"].(string)}
 
 	matchingRules := getMatchingRules(request)
-
-	if pathRule, hasPathRule := matchingRules["$.path"]; hasPathRule {
-		regexRule := pathRule.(map[string]interface{})["regex"].(string)
-		regex, err := regexp.Compile("^" + regexRule + "$")
-		if err != nil {
-			return nil, errors.Wrap(err, "unable to parse interaction definition, cannot parse path regex rule")
-		}
-
-		matcher = &regexPathMatcher{val: regex}
+	regexRule, err := getPathRegex(matchingRules)
+	if err != nil {
+		return nil, err
 	}
+
+	regex, err := regexp.Compile("^" + regexRule + "$")
+	if err != nil {
+		return nil, errors.Wrap(err, "unable to parse interaction definition, cannot parse path regex rule")
+	}
+
+	matcher = &regexPathMatcher{val: regex}
 
 	interaction := &interaction{
 		pathMatcher: matcher,
@@ -124,6 +125,32 @@ func LoadInteraction(data []byte, alias string) (*interaction, error) {
 	return nil, fmt.Errorf("unsupported media type %s", mediaType)
 }
 
+func getPathRegex(matchingRules map[string]interface{}) (string, error) {
+	if pathRule, hasPathRule := matchingRules["$.path"]; hasPathRule {
+
+		switch typedPathRule := pathRule.(type) {
+		case map[string]interface{}:
+			result, ok := typedPathRule["regex"].(string)
+			if ok {
+				return result, nil
+			}
+		case []interface{}:
+			{
+				for _, r := range typedPathRule {
+					if m, ok := r.(map[string]interface{}); ok {
+						if m["match"] == "regex" {
+							if regexRule, b := m["regex"].(string); b {
+								return regexRule, nil
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	return "", errors.New("cannot extract path matching rule")
+}
+
 func getMatchingRules(request map[string]interface{}) map[string]interface{} {
 	rules, hasRules := request["matchingRules"]
 	if !hasRules {
@@ -140,14 +167,13 @@ func getMatchingRules(request map[string]interface{}) map[string]interface{} {
 
 // Flattens a map with nested rules; stops when it finds a "matchers" or "regex" entry
 func flattenRulesMap(path string, mapToFlatten map[string]interface{}, outputMap map[string]interface{}) {
-	if outputMap == nil {
-		outputMap = make(map[string]interface{})
-	}
-
 	for k, v := range mapToFlatten {
 		k := strings.TrimPrefix(k, "$.")
-		if k == "matchers" || k == "regex" {
+		if k == "matchers" {
 			outputMap[path] = v
+		}
+		if k == "regex" {
+			outputMap[path+"."+k] = v
 		} else {
 			switch val := v.(type) {
 			case map[string]interface{}:
