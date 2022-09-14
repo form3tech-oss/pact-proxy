@@ -73,14 +73,9 @@ func LoadInteraction(data []byte, alias string) (*interaction, error) {
 	var matcher pathMatcher = &stringPathMatcher{val: request["path"].(string)}
 
 	matchingRules := getMatchingRules(request)
-	regexRule, err := getPathRegex(matchingRules)
+	regex, err := getPathRegex(matchingRules)
 	if err != nil {
 		return nil, err
-	}
-
-	regex, err := regexp.Compile("^" + regexRule + "$")
-	if err != nil {
-		return nil, errors.Wrap(err, "unable to parse interaction definition, cannot parse path regex rule")
 	}
 
 	matcher = &regexPathMatcher{val: regex}
@@ -125,30 +120,46 @@ func LoadInteraction(data []byte, alias string) (*interaction, error) {
 	return nil, fmt.Errorf("unsupported media type %s", mediaType)
 }
 
-func getPathRegex(matchingRules map[string]interface{}) (string, error) {
+// looks for a matching rule for key "$.path" in the supplied map
+// if the found element is a map, it is treated as a pacs v2 style matching rule (i.e. "$.path": { "regex": "<expression>" } )
+// if the found element is an array, it is treated as a pacs v3 list of matchers (i.e. "path": { "matchers": [ {"match": "regex", "regex": "<exp>"}]} )
+func getPathRegex(matchingRules map[string]interface{}) (*regexp.Regexp, error) {
+	var regexString string
+
 	if pathRule, hasPathRule := matchingRules["$.path"]; hasPathRule {
 
 		switch typedPathRule := pathRule.(type) {
 		case map[string]interface{}:
-			result, ok := typedPathRule["regex"].(string)
+			r, ok := typedPathRule["regex"].(string)
 			if ok {
-				return result, nil
+				regexString = r
 			}
 		case []interface{}:
 			{
 				for _, r := range typedPathRule {
 					if m, ok := r.(map[string]interface{}); ok {
 						if m["match"] == "regex" {
-							if regexRule, b := m["regex"].(string); b {
-								return regexRule, nil
+							if r, b := m["regex"].(string); b {
+								regexString = r
 							}
 						}
 					}
 				}
 			}
 		}
+		if regexString == "" {
+			return nil, errors.New("cannot extract path matching rule")
+		}
+
+		regex, err := regexp.Compile("^" + regexString + "$")
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to parse interaction definition, cannot parse path regex rule")
+		}
+
+		return regex, nil
 	}
-	return "", errors.New("cannot extract path matching rule")
+	// no path rule present
+	return nil, nil
 }
 
 func getMatchingRules(request map[string]interface{}) map[string]interface{} {
@@ -173,7 +184,7 @@ func flattenRulesMap(path string, mapToFlatten map[string]interface{}, outputMap
 			outputMap[path] = v
 		}
 		if k == "regex" {
-			outputMap[path+"."+k] = v
+			outputMap[path] = map[string]interface{}{k: v}
 		} else {
 			switch val := v.(type) {
 			case map[string]interface{}:
