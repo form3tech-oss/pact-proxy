@@ -167,11 +167,6 @@ func getMatchingRules(request map[string]interface{}) map[string]interface{} {
 		rules = make(map[string]interface{})
 	}
 	rulesMap := rules.(map[string]interface{})
-
-	// flatten the matching rules
-	//flattenedRulesMap := make(map[string]interface{})
-	//flattenRulesMap("$", rulesMap, flattenedRulesMap)
-
 	return rulesMap
 }
 
