@@ -73,14 +73,21 @@ func LoadInteraction(data []byte, alias string) (*interaction, error) {
 	var matcher pathMatcher = &stringPathMatcher{val: request["path"].(string)}
 
 	matchingRules := getMatchingRules(request)
-	regex, err := getPathRegex(matchingRules)
+	regexString, err := getPathRegex(matchingRules)
 	if err != nil {
 		return nil, err
 	}
 
-	propertiesWithMatchingRule := getBodyPropertiesWithMatchingRules(matchingRules)
+	if regexString != "" {
+		regex, err := regexp.Compile("^" + regexString + "$")
 
-	matcher = &regexPathMatcher{val: regex}
+		if err != nil {
+			return nil, errors.Wrap(err, "unable to parse interaction definition, cannot parse path regex rule")
+		}
+
+		matcher = &regexPathMatcher{val: regex}
+	}
+	propertiesWithMatchingRule := getBodyPropertiesWithMatchingRules(matchingRules)
 
 	interaction := &interaction{
 		pathMatcher: matcher,
@@ -125,7 +132,7 @@ func LoadInteraction(data []byte, alias string) (*interaction, error) {
 // looks for a matching rule for key "$.path" in the supplied map
 // if the found element is a map, it is treated as a pacs v2 style matching rule (i.e. "$.path": { "regex": "<expression>" } )
 // if the found element is an array, it is treated as a pacs v3 list of matchers (i.e. "path": { "matchers": [ {"match": "regex", "regex": "<exp>"}]} )
-func getPathRegex(matchingRules map[string]interface{}) (*regexp.Regexp, error) {
+func getPathRegex(matchingRules map[string]interface{}) (string, error) {
 	var regexString string
 
 	if pathRule, hasPathRule := matchingRules["$.path"]; hasPathRule {
@@ -149,19 +156,9 @@ func getPathRegex(matchingRules map[string]interface{}) (*regexp.Regexp, error) 
 				}
 			}
 		}
-		if regexString == "" {
-			return nil, errors.New("cannot extract path matching rule")
-		}
-
-		regex, err := regexp.Compile("^" + regexString + "$")
-		if err != nil {
-			return nil, errors.Wrap(err, "unable to parse interaction definition, cannot parse path regex rule")
-		}
-
-		return regex, nil
 	}
 	// no path rule present
-	return nil, nil
+	return regexString, nil
 }
 
 func getMatchingRules(request map[string]interface{}) map[string]interface{} {
