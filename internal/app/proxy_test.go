@@ -175,6 +175,25 @@ func TestModifiedBody_ForNRequests(t *testing.T) {
 		the_nth_response_name_is_(3, "any")
 }
 
+func TestModifiedBody_ForNRequestsa(t *testing.T) {
+	given, when, then := NewProxyStage(t)
+
+	given.
+		a_pact_that_allows_any_age().and().
+		a_modified_response_body_of_("$.body.age", 14).and().
+		a_modified_response_attempt_of(2)
+
+	when.
+		n_requests_are_sent_using_the_age(3, 100)
+
+	then.
+		pact_verification_is_successful().and().
+		n_responses_were_received(3).and().
+		the_nth_response_age_is_(1, 100).and().
+		the_nth_response_age_is_(2, 14).and().
+		the_nth_response_age_is_(3, 100)
+}
+
 func TestModifiedBodyWithFirstAndLastName_ForNRequests(t *testing.T) {
 	given, when, then := NewProxyStage(t)
 

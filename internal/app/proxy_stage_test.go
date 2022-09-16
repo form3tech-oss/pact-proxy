@@ -32,7 +32,7 @@ type ProxyStage struct {
 	responseBodies      [][]byte
 	modifiedStatusCode  int
 	modifiedAttempt     *int
-	modifiedBody        map[string]string
+	modifiedBody        map[string]interface{}
 }
 
 var largeString = strings.Repeat("long_string123BBmmF8BYezrBhCROOCRJfeH5k69hMKXH77TSvwF5GHUZFnbh1dsZ3d90HeR0jUIOovJJVS508uI17djeLFFSb7", 440)
@@ -48,7 +48,7 @@ func NewProxyStage(t *testing.T) (*ProxyStage, *ProxyStage, *ProxyStage) {
 		t:            t,
 		proxy:        proxy,
 		pact:         pact,
-		modifiedBody: make(map[string]string),
+		modifiedBody: make(map[string]interface{}),
 		pactName:     "pact-" + strconv.FormatInt(time.Now().UnixMilli(), 10),
 	}
 
@@ -99,6 +99,24 @@ func (s *ProxyStage) a_pact_that_allows_any_names() *ProxyStage {
 			Status:  200,
 			Headers: dsl.MapMatcher{"Content-Type": dsl.String("application/json")},
 			Body:    map[string]string{"name": "any"},
+		})
+	return s
+}
+
+func (s *ProxyStage) a_pact_that_allows_any_age() *ProxyStage {
+	s.pact.
+		AddInteraction().
+		UponReceiving(s.pactName).
+		WithRequest(dsl.Request{
+			Method:  "POST",
+			Path:    dsl.String("/users"),
+			Headers: dsl.MapMatcher{"Content-Type": dsl.String("application/json")},
+			Body:    dsl.MapMatcher{"age": dsl.Integer()},
+		}).
+		WillRespondWith(dsl.Response{
+			Status:  200,
+			Headers: dsl.MapMatcher{"Content-Type": dsl.String("application/json")},
+			Body:    map[string]int64{"age": 100},
 		})
 	return s
 }
@@ -230,7 +248,7 @@ func (s *ProxyStage) a_modified_response_status_of_(statusCode int) *ProxyStage 
 	return s
 }
 
-func (s *ProxyStage) a_modified_response_body_of_(path, value string) *ProxyStage {
+func (s *ProxyStage) a_modified_response_body_of_(path string, value interface{}) *ProxyStage {
 	s.modifiedBody[path] = value
 	return s
 }
@@ -253,6 +271,10 @@ func (s *ProxyStage) a_request_is_sent_using_the_name(name string) {
 
 func (s *ProxyStage) n_requests_are_sent_using_the_name(n int, name string) {
 	s.n_requests_are_sent_using_the_body(n, fmt.Sprintf(`{"name":"%s"}`, name))
+}
+
+func (s *ProxyStage) n_requests_are_sent_using_the_age(n int, age int64) {
+	s.n_requests_are_sent_using_the_body(n, fmt.Sprintf(`{"age": %d}`, age))
 }
 
 func (s *ProxyStage) n_requests_are_sent_using_the_body(n int, body string) {
@@ -408,6 +430,23 @@ func (s *ProxyStage) the_nth_response_name_is_(n int, name string) *ProxyStage {
 
 	if body["name"] != name {
 		s.t.Fatalf("Expected name on attempt %d,: %s, got: %s", n, name, body["name"])
+	}
+
+	return s
+}
+
+func (s *ProxyStage) the_nth_response_age_is_(n int, age int64) *ProxyStage {
+	if len(s.responses) < n {
+		s.t.Fatalf("Expected at least %d responses, got %d", n, len(s.responses))
+	}
+
+	var body map[string]int64
+	if err := json.Unmarshal(s.responseBodies[n-1], &body); err != nil {
+		s.t.Fatalf("unable to parse response body, %v", err)
+	}
+
+	if body["age"] != age {
+		s.t.Fatalf("Expected name on attempt %d,: %d, got: %d", n, age, body["age"])
 	}
 
 	return s
