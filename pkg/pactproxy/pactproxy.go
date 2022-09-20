@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -55,12 +54,11 @@ func (p *PactProxy) addConstraint(interaction, pactPath, value string) {
 	}
 }
 
-func (p *PactProxy) addModifier(interaction, path string, value interface{}, valueType string, attempt *int) {
+func (p *PactProxy) addModifier(interaction, path string, value interface{}, attempt *int) {
 	body := map[string]interface{}{
 		"interaction": interaction,
 		"path":        path,
 		"value":       value,
-		"type":        valueType,
 	}
 	if attempt != nil {
 		body["attempt"] = attempt
@@ -148,12 +146,7 @@ func (s InteractionSetup) AddConstraint(path, value string) InteractionSetup {
 }
 
 func (s InteractionSetup) AddModifier(path string, value interface{}, attempt *int) InteractionSetup {
-	s.pactProxy.addModifier(s.interaction, path, value, fmt.Sprintf("%T", value), attempt)
-	return s
-}
-
-func (s InteractionSetup) AddModifierAsType(path string, value interface{}, valueType string, attempt *int) InteractionSetup {
-	s.pactProxy.addModifier(s.interaction, path, value, valueType, attempt)
+	s.pactProxy.addModifier(s.interaction, path, value, attempt)
 	return s
 }
 

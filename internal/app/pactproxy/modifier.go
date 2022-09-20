@@ -12,19 +12,10 @@ import (
 	"github.com/tidwall/sjson"
 )
 
-type UnsupportedTypeSpecifiedError struct {
-	receivedType string
-}
-
-func (e UnsupportedTypeSpecifiedError) Error() string {
-	return fmt.Sprintf("Unsupported type specified: %s", e.receivedType)
-}
-
 type interactionModifier struct {
 	Interaction string      `json:"interaction"`
 	Path        string      `json:"path"`
 	Value       interface{} `json:"value"`
-	ValueType   string      `json:"type"`
 	Attempt     *int        `json:"attempt"`
 }
 
@@ -38,31 +29,6 @@ func loadModifier(data []byte) (*interactionModifier, error) {
 	err := json.Unmarshal(data, &modifier)
 	if err != nil {
 		return modifier, errors.Wrap(err, "unable to parse interactionModifier from data")
-	}
-	valueAsString := fmt.Sprintf("%v", modifier.Value)
-	switch modifier.ValueType {
-	case "string":
-		return modifier, nil
-	case "int":
-		intVal, err := strconv.Atoi(valueAsString)
-		if err != nil {
-			return nil, err
-		}
-		modifier.Value = intVal
-	case "int32":
-		intVal, err := strconv.ParseInt(valueAsString, 10, 32)
-		if err != nil {
-			return nil, err
-		}
-		modifier.Value = intVal
-	case "int64":
-		intVal, err := strconv.ParseInt(valueAsString, 10, 64)
-		if err != nil {
-			return nil, err
-		}
-		modifier.Value = intVal
-	default:
-		return nil, &UnsupportedTypeSpecifiedError{receivedType: fmt.Sprintf("%T", modifier.Value)}
 	}
 
 	return modifier, nil
@@ -104,11 +70,10 @@ func (ims *interactionModifiers) modifyStatusCode() (bool, int) {
 	for _, m := range ims.Modifiers() {
 		if m.Path == "$.status" {
 			if m.Attempt == nil || *m.Attempt == int(atomic.LoadInt32(&ims.interaction.requestCount)) {
-				code, ok := m.Value.(int)
-				if !ok {
-					return false, 0
+				code, err := strconv.Atoi(fmt.Sprintf("%v", m.Value))
+				if err == nil {
+					return true, code
 				}
-				return true, code
 			}
 		}
 	}

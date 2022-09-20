@@ -24,6 +24,8 @@ pact/
 .serverport
 internal/app/pacts/myconsumer-myprovider.json
 
+# logs
+*.log
 
 
 # Visual Studio Code
