@@ -20,6 +20,4 @@ WORKDIR /app
 COPY build/package/$APPNAME/entrypoint.sh /app/
 COPY --from=build-env /go/bin/$APPNAME /app/
 
-RUN ip -4 route list match 0/0 | awk '{print $3 "host.docker.internal"}' >> /etc/hosts
-
 ENTRYPOINT ./entrypoint.sh

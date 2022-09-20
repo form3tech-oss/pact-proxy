@@ -1,6 +1,7 @@
 package pactproxy
 
 import (
+	"encoding/json"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"testing"
@@ -329,6 +330,81 @@ func Test_parseMediaType(t *testing.T) {
 			if !tt.wantErr {
 				assert.Equal(t, tt.want, got)
 			}
+		})
+	}
+}
+
+func Test_getPathRegex(t *testing.T) {
+	tests := []struct {
+		name    string
+		args    string
+		want    string
+		wantErr bool
+	}{
+		{
+			"v2 pact matching rules",
+			`{"$.path":{ "regex": "1234"}}`,
+			"1234",
+			false,
+		},
+		{
+			"v2 pact matching rules invalid content",
+			`{"$.path":{ "invalid": "1234"}}`,
+			"",
+			true,
+		},
+		{
+			"v3 pact matching rules",
+			`{"path":{ "matchers": [{
+								"match": "regex",
+								"regex": "1234"
+							  }]}}`,
+
+			"1234",
+			false,
+		},
+		{
+			"v3 pact matching rules invalid match type",
+			`{"path":{ "matchers": [{
+								"match": "invalid",
+								"regex": "1234"
+							  }]}}`,
+
+			"",
+			true,
+		},
+		{
+			"v3 pact matching rules invalid content",
+			`{"path":{ "invalid": [{
+								"match": "regex",
+								"regex": "1234"
+							  }]}}`,
+			"",
+			true,
+		},
+
+		{
+			"v3 pact matching rules invalid match key",
+			`{"path":{ "matchers": [{
+								"match": "regex",
+								"invalid": "1234"
+							  }]
+}}`,
+			"",
+			true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			input := map[string]interface{}{}
+			err := json.Unmarshal([]byte(tt.args), &input)
+			assert.NoError(t, err)
+			got, err := getPathRegex(input)
+			if tt.wantErr && err != nil {
+				return
+			}
+			assert.Equalf(t, tt.want, got, "getPathRegex(%v)", tt.args)
 		})
 	}
 }

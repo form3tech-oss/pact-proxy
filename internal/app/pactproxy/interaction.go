@@ -135,28 +135,44 @@ func LoadInteraction(data []byte, alias string) (*interaction, error) {
 func getPathRegex(matchingRules map[string]interface{}) (string, error) {
 	var regexString string
 
-	if pathRule, hasPathRule := matchingRules["$.path"]; hasPathRule {
-
-		switch typedPathRule := pathRule.(type) {
-		case map[string]interface{}:
-			r, ok := typedPathRule["regex"].(string)
-			if ok {
-				regexString = r
-			}
-		case []interface{}:
-			{
-				for _, r := range typedPathRule {
-					if m, ok := r.(map[string]interface{}); ok {
-						if m["match"] == "regex" {
-							if r, b := m["regex"].(string); b {
-								regexString = r
-							}
-						}
-					}
-				}
-			}
+	if rule, hasPathV2Rule := matchingRules["$.path"]; hasPathV2Rule {
+		val, ok := rule.(map[string]interface{})
+		if !ok {
+			return "", fmt.Errorf("invalid v2 pathRegex invalid content")
 		}
+		regexType, ok := val["regex"]
+		if !ok {
+			return "", fmt.Errorf("invalid v2 pathRegex does not have regex value")
+		}
+		regexString, ok = regexType.(string)
+
+	} else if rule, hasPathV3Rule := matchingRules["path"]; hasPathV3Rule {
+		//map[string][]map[string]string
+		val, ok := rule.(map[string]interface{})
+		if !ok {
+			return "", fmt.Errorf("invalid v3 pathRegex invalid content")
+		}
+		matchers, ok := val["matchers"]
+		if !ok {
+			return "", fmt.Errorf("invalid v3 pathRegex  no matchers")
+		}
+		matchersArray := matchers.([]interface{})
+		if len(matchersArray) == 0 {
+			return "", fmt.Errorf("invalid v3 empty matchers")
+		}
+		matchersStruct := matchersArray[0].(map[string]interface{})
+
+		if match, ok := matchersStruct["match"]; !ok || match.(string) != "regex" {
+			return "", fmt.Errorf("invalid v3 pathRegex matcher is not regex")
+		}
+		regex, ok := matchersStruct["regex"]
+		if !ok {
+			return "", fmt.Errorf("invalid v3 pathRegex regex not founded")
+		}
+
+		regexString = regex.(string)
 	}
+
 	// no path rule present
 	return regexString, nil
 }
@@ -169,28 +185,6 @@ func getMatchingRules(request map[string]interface{}) map[string]interface{} {
 	rulesMap := rules.(map[string]interface{})
 	return rulesMap
 }
-
-// Flattens a map with nested rules; stops when it finds a "matchers" or "regex" entry
-/*
-func flattenRulesMap(path string, mapToFlatten map[string]interface{}, outputMap map[string]interface{}) {
-	for k, v := range mapToFlatten {
-		k := strings.TrimPrefix(k, "$.")
-		if k == "matchers" {
-			outputMap[path] = v
-		}
-		if k == "regex" {
-			outputMap[path] = map[string]interface{}{k: v}
-		} else {
-			switch val := v.(type) {
-			case map[string]interface{}:
-				flattenRulesMap(path+"."+k, val, outputMap)
-			default:
-				outputMap[path+"."+k] = v
-			}
-		}
-	}
-}
-*/
 
 // finds the paths of the body properties for which the matchingRules map
 // contains matching rules
@@ -207,7 +201,7 @@ func getBodyPropertiesWithMatchingRules(matchingRules map[string]interface{}) ma
 			// and the values being the related matchers. We are only interested
 			// in the property names here.
 			if properties, ok := v.(map[string]interface{}); ok {
-				for propertyname, _ := range properties {
+				for propertyname := range properties {
 					path := strings.TrimPrefix(propertyname, "$.")
 					path = "$.body." + path
 					results[path] = true
