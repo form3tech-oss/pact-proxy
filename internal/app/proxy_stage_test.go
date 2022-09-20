@@ -19,20 +19,21 @@ import (
 )
 
 type ProxyStage struct {
-	t                   *testing.T
-	pact                *dsl.Pact
-	proxy               *pactproxy.PactProxy
-	nameConstraintValue string
-	bodyConstraintValue string
-	pactResult          error
-	pactName            string
-	requestsToSend      int32
-	requestsSent        int32
-	responses           []*http.Response
-	responseBodies      [][]byte
-	modifiedStatusCode  int
-	modifiedAttempt     *int
-	modifiedBody        map[string]interface{}
+	t                     *testing.T
+	pact                  *dsl.Pact
+	proxy                 *pactproxy.PactProxy
+	contentTypeConstraint string
+	nameConstraintValue   string
+	bodyConstraintValue   string
+	pactResult            error
+	pactName              string
+	requestsToSend        int32
+	requestsSent          int32
+	responses             []*http.Response
+	responseBodies        [][]byte
+	modifiedStatusCode    int
+	modifiedAttempt       *int
+	modifiedBody          map[string]interface{}
 }
 
 var largeString = strings.Repeat("long_string123BBmmF8BYezrBhCROOCRJfeH5k69hMKXH77TSvwF5GHUZFnbh1dsZ3d90HeR0jUIOovJJVS508uI17djeLFFSb7", 440)
@@ -238,6 +239,11 @@ func (s *ProxyStage) a_name_constraint_is_added(name string) *ProxyStage {
 	return s
 }
 
+func (s *ProxyStage) a_content_type_constraint_is_added(value string) *ProxyStage {
+	s.contentTypeConstraint = value
+	return s
+}
+
 func (s *ProxyStage) a_body_constraint_is_added(name string) *ProxyStage {
 	s.bodyConstraintValue = name
 	return s
@@ -288,6 +294,10 @@ func (s *ProxyStage) n_requests_are_sent_using_the_body_and_content_type(n int, 
 
 		if s.nameConstraintValue != "" {
 			i.AddConstraint("$.body.name", s.nameConstraintValue)
+		}
+
+		if s.contentTypeConstraint != "" {
+			i.AddConstraint("$.headers[\"Content-Type\"]", s.contentTypeConstraint)
 		}
 
 		if s.bodyConstraintValue != "" {

@@ -78,6 +78,35 @@ func TestConstraintDoesntMatch(t *testing.T) {
 		pact_verification_is_not_successful()
 }
 
+func TestConstraintHeaderMatch(t *testing.T) {
+	given, when, then := NewProxyStage(t)
+
+	given.
+		a_pact_that_allows_any_names().and().
+		a_content_type_constraint_is_added("application/json")
+
+	when.
+		a_request_is_sent_using_the_name("sam")
+
+	then.
+		pact_verification_is_successful().and().
+		pact_can_be_generated()
+}
+
+func TestConstraintHeaderDoesntMatch(t *testing.T) {
+	given, when, then := NewProxyStage(t)
+
+	given.
+		a_pact_that_allows_any_names().and().
+		a_content_type_constraint_is_added("text/plain")
+
+	when.
+		a_request_is_sent_using_the_name("sam")
+
+	then.
+		pact_verification_is_not_successful()
+}
+
 func TestWaitForPact(t *testing.T) {
 	given, when, then := NewProxyStage(t)
 
@@ -175,7 +204,7 @@ func TestModifiedBody_ForNRequests(t *testing.T) {
 		the_nth_response_name_is_(3, "any")
 }
 
-func TestModifiedBody_ForNRequestsa(t *testing.T) {
+func TestModifiedBody_With_Numeric_attributes_ForNRequests(t *testing.T) {
 	given, when, then := NewProxyStage(t)
 
 	given.
