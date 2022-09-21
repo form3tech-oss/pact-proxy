@@ -219,7 +219,7 @@ func (a *api) interactionsWaitHandler(res http.ResponseWriter, req *http.Request
 }
 
 func (a *api) indexHandler(res http.ResponseWriter, req *http.Request) {
-	log.Infof("proxying %s", req.URL.Path)
+	log.Infof("proxying %s %s", req.Method, req.URL.Path)
 
 	mediaType, err := parseMediaTypeHeader(req.Header)
 	if err != nil {
@@ -258,6 +258,13 @@ func (a *api) indexHandler(res http.ResponseWriter, req *http.Request) {
 		httpresponse.Errorf(res, http.StatusInternalServerError, "unable to read requestDocument data. %s", err.Error())
 		return
 	}
+	h := make(map[string]interface{})
+	for headerName, headerValues := range req.Header {
+		for _, headerValue := range headerValues {
+			h[headerName] = headerValue
+		}
+	}
+	request["headers"] = h
 
 	unmatched := make(map[string][]string)
 	matched := make([]*interaction, 0)
