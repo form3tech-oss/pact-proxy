@@ -2,6 +2,7 @@ package pactproxy
 
 import (
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"strings"
 	"sync"
@@ -12,10 +13,10 @@ import (
 )
 
 type interactionModifier struct {
-	Interaction string `json:"interaction"`
-	Path        string `json:"path"`
-	Value       string `json:"value"`
-	Attempt     *int   `json:"attempt"`
+	Interaction string      `json:"interaction"`
+	Path        string      `json:"path"`
+	Value       interface{} `json:"value"`
+	Attempt     *int        `json:"attempt"`
 }
 
 type interactionModifiers struct {
@@ -29,6 +30,7 @@ func loadModifier(data []byte) (*interactionModifier, error) {
 	if err != nil {
 		return modifier, errors.Wrap(err, "unable to parse interactionModifier from data")
 	}
+
 	return modifier, nil
 }
 
@@ -68,7 +70,7 @@ func (ims *interactionModifiers) modifyStatusCode() (bool, int) {
 	for _, m := range ims.Modifiers() {
 		if m.Path == "$.status" {
 			if m.Attempt == nil || *m.Attempt == int(atomic.LoadInt32(&ims.interaction.requestCount)) {
-				code, err := strconv.Atoi(m.Value)
+				code, err := strconv.Atoi(fmt.Sprintf("%v", m.Value))
 				if err == nil {
 					return true, code
 				}
