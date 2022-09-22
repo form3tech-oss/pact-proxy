@@ -374,6 +374,23 @@ func Test_getPathRegex(t *testing.T) {
 			true,
 		},
 		{
+			"v3 pact matching rules - multiple",
+			`{"path":{ "matchers": [
+							{
+								"match": "test"
+							},
+							{
+								"match": "regex",
+								"regex": "1234"
+							}, 
+							{
+								"match": "type"
+							}
+							]}}`,
+			"1234",
+			false,
+		},
+		{
 			"v3 pact matching rules invalid content",
 			`{"path":{ "invalid": [{
 								"match": "regex",
@@ -389,7 +406,7 @@ func Test_getPathRegex(t *testing.T) {
 								"match": "regex",
 								"invalid": "1234"
 							  }]
-}}`,
+					}}`,
 			"",
 			true,
 		},
@@ -401,8 +418,11 @@ func Test_getPathRegex(t *testing.T) {
 			err := json.Unmarshal([]byte(tt.args), &input)
 			assert.NoError(t, err)
 			got, err := getPathRegex(input)
-			if tt.wantErr && err != nil {
-				return
+			if tt.wantErr {
+				assert.NotNil(t, err)
+			}
+			if !tt.wantErr {
+				assert.Nil(t, err)
 			}
 			assert.Equalf(t, tt.want, got, "getPathRegex(%v)", tt.args)
 		})

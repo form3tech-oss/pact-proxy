@@ -145,32 +145,46 @@ func getPathRegex(matchingRules map[string]interface{}) (string, error) {
 			return "", fmt.Errorf("invalid v2 pathRegex does not have regex value")
 		}
 		regexString, ok = regexType.(string)
+		if !ok {
+			return "", fmt.Errorf("invalid v2 pathRegex invalid regex type")
+		}
 
-	} else if rule, hasPathV3Rule := matchingRules["path"]; hasPathV3Rule {
-		//map[string][]map[string]string
+		return regexString, nil
+	}
+
+	if rule, hasPathV3Rule := matchingRules["path"]; hasPathV3Rule {
 		val, ok := rule.(map[string]interface{})
 		if !ok {
 			return "", fmt.Errorf("invalid v3 pathRegex invalid content")
 		}
 		matchers, ok := val["matchers"]
 		if !ok {
-			return "", fmt.Errorf("invalid v3 pathRegex  no matchers")
+			return "", fmt.Errorf("invalid v3 pathRegex no matchers")
 		}
-		matchersArray := matchers.([]interface{})
-		if len(matchersArray) == 0 {
-			return "", fmt.Errorf("invalid v3 empty matchers")
-		}
-		matchersStruct := matchersArray[0].(map[string]interface{})
-
-		if match, ok := matchersStruct["match"]; !ok || match.(string) != "regex" {
-			return "", fmt.Errorf("invalid v3 pathRegex matcher is not regex")
-		}
-		regex, ok := matchersStruct["regex"]
-		if !ok {
-			return "", fmt.Errorf("invalid v3 pathRegex regex not founded")
+		matchersArray, ok := matchers.([]interface{})
+		if !ok || len(matchersArray) == 0 {
+			return "", fmt.Errorf("invalid v3 matchers")
 		}
 
-		regexString = regex.(string)
+		for _, matcher := range matchersArray {
+			matchersStruct := matcher.(map[string]interface{})
+
+			if match, ok := matchersStruct["match"]; !ok || match.(string) != "regex" {
+				continue
+			}
+			regex, ok := matchersStruct["regex"]
+			if !ok {
+				continue
+			}
+			_, ok = regex.(string)
+			if !ok {
+				return "", fmt.Errorf("invalid v3 pathRegex invalid regex type")
+			}
+
+			return regex.(string), nil
+		}
+
+		return "", fmt.Errorf("invalid v3 no regex matcher is found")
 	}
 
 	// no path rule present
