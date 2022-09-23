@@ -354,7 +354,7 @@ func Test_getPathRegex(t *testing.T) {
 			true,
 		},
 		{
-			"v3 pact matching rules",
+			"v3 pact matching rules - valid ",
 			`{"path":{ "matchers": [{
 								"match": "regex",
 								"regex": "1234"
@@ -364,7 +364,7 @@ func Test_getPathRegex(t *testing.T) {
 			false,
 		},
 		{
-			"v3 pact matching rules invalid match type",
+			"v3 pact matching rules - invalid match type",
 			`{"path":{ "matchers": [{
 								"match": "invalid",
 								"regex": "1234"
@@ -374,7 +374,7 @@ func Test_getPathRegex(t *testing.T) {
 			true,
 		},
 		{
-			"v3 pact matching rules - multiple",
+			"v3 pact matching rules - multiple valid",
 			`{"path":{ "matchers": [
 							{
 								"match": "test"
@@ -391,7 +391,7 @@ func Test_getPathRegex(t *testing.T) {
 			false,
 		},
 		{
-			"v3 pact matching rules invalid content",
+			"v3 pact matching rules - invalid content",
 			`{"path":{ "invalid": [{
 								"match": "regex",
 								"regex": "1234"
@@ -399,9 +399,15 @@ func Test_getPathRegex(t *testing.T) {
 			"",
 			true,
 		},
-
 		{
-			"v3 pact matching rules invalid match key",
+			"v3 pact matching rules - regex field is not found",
+			`{"path":{ "invalid": [{
+								"match": "regex" }]}}`,
+			"",
+			true,
+		},
+		{
+			"v3 pact matching rules - invalid match key",
 			`{"path":{ "matchers": [{
 								"match": "regex",
 								"invalid": "1234"
@@ -420,8 +426,7 @@ func Test_getPathRegex(t *testing.T) {
 			got, err := getPathRegex(input)
 			if tt.wantErr {
 				assert.NotNil(t, err)
-			}
-			if !tt.wantErr {
+			} else {
 				assert.Nil(t, err)
 			}
 			assert.Equalf(t, tt.want, got, "getPathRegex(%v)", tt.args)

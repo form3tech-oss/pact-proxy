@@ -159,11 +159,11 @@ func getPathRegex(matchingRules map[string]interface{}) (string, error) {
 		}
 		matchers, ok := val["matchers"]
 		if !ok {
-			return "", fmt.Errorf("invalid v3 pathRegex no matchers")
+			return "", fmt.Errorf("invalid v3 pathRegex - no matchers found")
 		}
 		matchersArray, ok := matchers.([]interface{})
 		if !ok || len(matchersArray) == 0 {
-			return "", fmt.Errorf("invalid v3 matchers")
+			return "", fmt.Errorf("invalid v3 pathRegex - invalid matchers")
 		}
 
 		for _, matcher := range matchersArray {
@@ -174,17 +174,17 @@ func getPathRegex(matchingRules map[string]interface{}) (string, error) {
 			}
 			regex, ok := matchersStruct["regex"]
 			if !ok {
-				continue
+				return "", fmt.Errorf("invalid v3 pathRegex - \"regex\" field is not found")
 			}
 			_, ok = regex.(string)
 			if !ok {
-				return "", fmt.Errorf("invalid v3 pathRegex invalid regex type")
+				return "", fmt.Errorf("invalid v3 pathRegex - invalid regex type")
 			}
 
 			return regex.(string), nil
 		}
 
-		return "", fmt.Errorf("invalid v3 no regex matcher is found")
+		return "", fmt.Errorf("invalid v3 pathRegex - regex matcher is not found")
 	}
 
 	// no path rule present
