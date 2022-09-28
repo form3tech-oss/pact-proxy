@@ -11,6 +11,7 @@ import (
 	"github.com/form3tech-oss/pact-proxy/pkg/pactproxy"
 	"github.com/pact-foundation/pact-go/dsl"
 	log "github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -20,6 +21,7 @@ const (
 
 type ConcurrentProxyStage struct {
 	t                                  *testing.T
+	require                            *require.Assertions
 	proxy                              *pactproxy.PactProxy
 	pact                               *dsl.Pact
 	modifiedNameStatusCode             int
@@ -40,9 +42,10 @@ func NewConcurrentProxyStage(t *testing.T) (*ConcurrentProxyStage, *ConcurrentPr
 	}
 
 	s := &ConcurrentProxyStage{
-		t:     t,
-		pact:  pact,
-		proxy: proxy,
+		t:       t,
+		require: require.New(t),
+		pact:    pact,
+		proxy:   proxy,
 	}
 
 	t.Cleanup(func() {
@@ -144,42 +147,28 @@ func (s *ConcurrentProxyStage) the_concurrent_requests_are_sent() {
 		return nil
 	})
 
-	if err != nil {
-		s.t.Error(err)
-	}
+	s.require.NoError(err)
 }
 
 func (s *ConcurrentProxyStage) makeUserRequest() {
 	u := fmt.Sprintf("http://localhost:%s/users", proxyURL.Port())
 	req, err := http.NewRequest("POST", u, strings.NewReader(`{"name":"jim"}`))
-	if err != nil {
-		s.t.Error(err)
-		return
-	}
+	s.require.NoError(err)
 
 	req.Header.Set("Content-Type", "application/json")
 	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		s.t.Error(err)
-		return
-	}
+	s.require.NoError(err)
 	s.userResponses = append(s.userResponses, res)
 }
 
 func (s *ConcurrentProxyStage) makeAddressRequest() {
 	u := fmt.Sprintf("http://localhost:%s/addresses", proxyURL.Port())
 	req, err := http.NewRequest("POST", u, strings.NewReader(`{"address":"test"}`))
-	if err != nil {
-		s.t.Error(err)
-		return
-	}
+	s.require.NoError(err)
 
 	req.Header.Set("Content-Type", "application/json")
 	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		s.t.Error(err)
-		return
-	}
+	s.require.NoError(err)
 	s.addressResponses = append(s.addressResponses, res)
 }
 
@@ -208,13 +197,10 @@ func sendConcurrentRequests(requests int, d time.Duration, f func()) {
 
 func (s *ConcurrentProxyStage) all_the_user_responses_should_have_the_right_status_code() *ConcurrentProxyStage {
 	expectedLen := s.concurrentUserRequestsPerSecond * int(s.concurrentUserRequestsDuration/time.Second)
-	if len(s.userResponses) != expectedLen {
-		s.t.Errorf("expected %d user responses, but got %d", expectedLen, len(s.userResponses))
-	}
+	s.require.Len(s.userResponses, expectedLen, "number of user responses is not as expected")
+
 	for _, res := range s.userResponses {
-		if s.modifiedNameStatusCode != res.StatusCode {
-			s.t.Errorf("expected user status code of %d, but got %d", s.modifiedNameStatusCode, res.StatusCode)
-		}
+		s.require.Equal(res.StatusCode, s.modifiedNameStatusCode, "expected user status code")
 	}
 
 	return s
@@ -222,13 +208,10 @@ func (s *ConcurrentProxyStage) all_the_user_responses_should_have_the_right_stat
 
 func (s *ConcurrentProxyStage) all_the_address_responses_should_have_the_right_status_code() *ConcurrentProxyStage {
 	expectedLen := s.concurrentAddressRequestsPerSecond * int(s.concurrentAddressRequestsDuration/time.Second)
-	if len(s.addressResponses) != expectedLen {
-		s.t.Errorf("expected %d address responses, but got %d", expectedLen, len(s.addressResponses))
-	}
+	s.require.Len(s.addressResponses, expectedLen, "number of address responses is not as expected")
+
 	for _, res := range s.addressResponses {
-		if s.modifiedAddressStatusCode != res.StatusCode {
-			s.t.Errorf("expected address status code of %d, but got %d", s.modifiedAddressStatusCode, res.StatusCode)
-		}
+		s.require.Equal(res.StatusCode, s.modifiedAddressStatusCode, "expected address status code")
 	}
 
 	return s
@@ -236,22 +219,14 @@ func (s *ConcurrentProxyStage) all_the_address_responses_should_have_the_right_s
 
 func (s *ConcurrentProxyStage) the_proxy_waits_for_all_user_responses() *ConcurrentProxyStage {
 	want := s.concurrentUserRequestsPerSecond * int(s.concurrentUserRequestsDuration/time.Second)
-	received := len(s.userResponses)
-	if received != want {
-		s.t.Errorf("expected %d user responses, but got %d", want, received)
-		s.t.Fail()
-	}
+	s.require.Len(s.userResponses, want, "number of user responses is not as expected")
 
 	return s
 }
 
 func (s *ConcurrentProxyStage) the_proxy_waits_for_all_address_responses() *ConcurrentProxyStage {
 	want := s.concurrentAddressRequestsPerSecond * int(s.concurrentAddressRequestsDuration/time.Second)
-	received := len(s.addressResponses)
-	if received != want {
-		s.t.Errorf("expected %d address responses, but got %d", want, received)
-		s.t.Fail()
-	}
+	s.require.Len(s.addressResponses, want, "number of address responses is not as expected")
 
 	return s
 }
