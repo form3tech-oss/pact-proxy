@@ -40,7 +40,9 @@ func GetServer(url *url.URL) (*echo.Echo, error) {
 	}
 	proxyServer.HideBanner = true
 
-	// rootServer.Server.Handler Handle(url.Path+"/", http.StripPrefix(url.Path, proxyServer.Server().Handler))
+	rootServer.Any(url.Path+"/", echo.WrapHandler(http.StripPrefix(url.Path, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		proxyServer.ServeHTTP(w, r)
+	}))))
 
 	return proxyServer, nil
 }
