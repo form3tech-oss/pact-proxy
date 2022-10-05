@@ -5,10 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/avast/retry-go/v4"
-	"github.com/form3tech-oss/pact-proxy/pkg/pactproxy"
-	"github.com/pact-foundation/pact-go/dsl"
-	"github.com/pkg/errors"
 	"io"
 	"net/http"
 	"strconv"
@@ -16,6 +12,11 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/avast/retry-go/v4"
+	"github.com/form3tech-oss/pact-proxy/pkg/pactproxy"
+	"github.com/pact-foundation/pact-go/dsl"
+	"github.com/pkg/errors"
 )
 
 type ProxyStage struct {
