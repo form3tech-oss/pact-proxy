@@ -58,8 +58,8 @@ func StartProxy(e *echo.Echo, target *url.URL) {
 	e.Any("/interactions/verification", a.proxyPassHandler)
 	e.Any("/pact", a.proxyPassHandler)
 
-	e.POST("/interactions/constraints", a.interactionsConstraintsHandler) // TODO is this a POST ?
-	e.POST("/interactions/modifiers", a.interactionsModifiersHandler)     // TODO is this a POST ?
+	e.POST("/interactions/constraints", a.interactionsConstraintsHandler)
+	e.POST("/interactions/modifiers", a.interactionsModifiersHandler)
 
 	e.DELETE("/session", a.sessionHandler)
 
