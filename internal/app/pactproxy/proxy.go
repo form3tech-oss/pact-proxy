@@ -26,7 +26,7 @@ var supportedMediaTypes = map[string]func([]byte, *url.URL) (requestDocument, er
 	mediaTypeText: ParsePlainTextRequest,
 }
 
-type ProxyContext struct {
+type api struct {
 	target       *url.URL
 	proxy        *httputil.ReverseProxy
 	interactions *Interactions
@@ -36,71 +36,57 @@ type ProxyContext struct {
 	echo.Context
 }
 
-func (cc *ProxyContext) ProxyRequest() error {
-	cc.proxy.ServeHTTP(cc.Response(), cc.Request())
+func (a *api) ProxyRequest(c echo.Context) error {
+	a.proxy.ServeHTTP(c.Response(), c.Request())
 	return nil
 }
 
 func StartProxy(e *echo.Echo, target *url.URL) {
 
 	// Create these once at startup, thay are shared by all server threads
-	proxy := httputil.NewSingleHostReverseProxy(target)
-	notify := NewNotify()
-	interactions := &Interactions{}
+	a := api{
+		target:       target,
+		proxy:        httputil.NewSingleHostReverseProxy(target),
+		interactions: &Interactions{},
+		notify:       NewNotify(),
+		delay:        defaultDelay,
+		duration:     defaultDuration,
+	}
 
-	// Create a middleware to extend default context, adding the api params
-	e.Use(func(next echo.HandlerFunc) echo.HandlerFunc {
-		return func(c echo.Context) error {
-			cc := &ProxyContext{
-				target:       target,
-				proxy:        proxy,
-				interactions: interactions,
-				notify:       notify,
-				delay:        defaultDelay,
-				duration:     defaultDuration,
-				Context:      c,
-			}
-			return next(cc)
-		}
-	})
+	e.GET("/ready", a.readinessHandler)
 
-	e.GET("/ready", readinessHandler)
+	e.Any("/interactions/verification", a.proxyPassHandler)
+	e.Any("/pact", a.proxyPassHandler)
 
-	e.Any("/interactions/verification", proxyPassHandler)
-	e.Any("/pact", proxyPassHandler)
+	e.POST("/interactions/constraints", a.interactionsConstraintsHandler) // TODO is this a POST ?
+	e.POST("/interactions/modifiers", a.interactionsModifiersHandler)     // TODO is this a POST ?
 
-	e.POST("/interactions/constraints", interactionsConstraintsHandler) // TODO is this a POST ?
-	e.POST("/interactions/modifiers", interactionsModifiersHandler)     // TODO is this a POST ?
+	e.DELETE("/session", a.sessionHandler)
 
-	e.DELETE("/session", sessionHandler)
+	e.POST("/interactions", a.interactionsPostHandler)
+	e.DELETE("/interactions", a.interactionsDeleteHandler)
 
-	e.POST("/interactions", interactionsPostHandler)
-	e.DELETE("/interactions", interactionsDeleteHandler)
+	e.GET("/interactions/wait", a.interactionsWaitHandler)
 
-	e.GET("/interactions/wait", interactionsWaitHandler)
-
-	e.Any("/*", indexHandler)
+	e.Any("/*", a.indexHandler)
 }
 
-func proxyPassHandler(c echo.Context) error {
-	cc := c.(*ProxyContext)
-	return cc.ProxyRequest()
+func (a *api) proxyPassHandler(c echo.Context) error {
+	return a.ProxyRequest(c)
 }
 
-func readinessHandler(c echo.Context) error {
+func (a *api) readinessHandler(c echo.Context) error {
 	return c.NoContent(http.StatusOK)
 }
 
-func interactionsConstraintsHandler(c echo.Context) error {
-	cc := c.(*ProxyContext)
-
+func (a *api) interactionsConstraintsHandler(c echo.Context) error {
 	constraint := interactionConstraint{}
-	err := cc.Bind(&constraint)
+	err := c.Bind(&constraint)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, httpresponse.Errorf("unable to load constraint. %s", err.Error()))
 	}
 
-	interaction, ok := cc.interactions.Load(constraint.Interaction)
+	interaction, ok := a.interactions.Load(constraint.Interaction)
 	if !ok {
 		return c.JSON(http.StatusBadRequest, httpresponse.Errorf("unable to find interaction. %s", constraint.Interaction))
 	}
@@ -111,15 +97,14 @@ func interactionsConstraintsHandler(c echo.Context) error {
 	return c.NoContent(http.StatusOK)
 }
 
-func interactionsModifiersHandler(c echo.Context) error {
-	cc := c.(*ProxyContext)
+func (a *api) interactionsModifiersHandler(c echo.Context) error {
 	modifier := &interactionModifier{}
-	err := cc.Bind(modifier)
+	err := c.Bind(modifier)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, httpresponse.Errorf("unable to load modifier. %s", err.Error()))
 	}
 
-	interaction, ok := cc.interactions.Load(modifier.Interaction)
+	interaction, ok := a.interactions.Load(modifier.Interaction)
 	if !ok {
 		return c.JSON(http.StatusBadRequest, httpresponse.Errorf("unable to find interaction for modifier. %s", modifier.Interaction))
 	}
@@ -130,29 +115,25 @@ func interactionsModifiersHandler(c echo.Context) error {
 	return c.NoContent(http.StatusOK)
 }
 
-func sessionHandler(c echo.Context) error {
-	cc := c.(*ProxyContext)
-	log.Infof("deleting session for %s", cc.target)
-	cc.ProxyRequest()
-	return nil
+func (a *api) sessionHandler(c echo.Context) error {
+	log.Infof("deleting session for %s", a.target)
+	return a.ProxyRequest(c)
 }
 
-func interactionsDeleteHandler(c echo.Context) error {
-	cc := c.(*ProxyContext)
+func (a *api) interactionsDeleteHandler(c echo.Context) error {
 	log.Info("deleting interactions")
-	cc.ProxyRequest()
-	cc.interactions.Clear()
+	a.ProxyRequest(c)
+	a.interactions.Clear()
 	return nil
 }
 
-func interactionsPostHandler(c echo.Context) error {
-	cc := c.(*ProxyContext)
-	data, err := ioutil.ReadAll(cc.Request().Body)
+func (a *api) interactionsPostHandler(c echo.Context) error {
+	data, err := ioutil.ReadAll(c.Request().Body)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, httpresponse.Errorf("unable to read interaction. %s", err.Error()))
 	}
 
-	interaction, err := LoadInteraction(data, cc.QueryParam("alias"))
+	interaction, err := LoadInteraction(data, c.QueryParam("alias"))
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, httpresponse.Errorf("unable to load interaction. %s", err.Error()))
 	}
@@ -163,27 +144,26 @@ func interactionsPostHandler(c echo.Context) error {
 		log.Infof("storing interaction '%s'", interaction.Description)
 	}
 
-	cc.interactions.Store(interaction)
+	a.interactions.Store(interaction)
 
-	err = cc.Request().Body.Close()
+	err = c.Request().Body.Close()
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, httpresponse.Error(err.Error()))
 	}
 
-	cc.Request().Body = ioutil.NopCloser(bytes.NewBuffer(data))
+	c.Request().Body = ioutil.NopCloser(bytes.NewBuffer(data))
 
-	return cc.ProxyRequest()
+	return a.ProxyRequest(c)
 }
 
-func interactionsWaitHandler(c echo.Context) error {
-	cc := c.(*ProxyContext)
-	waitForCount, err := strconv.Atoi(cc.QueryParam("count"))
+func (a *api) interactionsWaitHandler(c echo.Context) error {
+	waitForCount, err := strconv.Atoi(c.QueryParam("count"))
 	if err != nil {
 		waitForCount = 1
 	}
 
-	if waitFor := cc.QueryParam("interaction"); waitFor != "" {
-		interaction, ok := cc.interactions.Load(waitFor)
+	if waitFor := c.QueryParam("interaction"); waitFor != "" {
+		interaction, ok := a.interactions.Load(waitFor)
 		if !ok {
 			return c.JSON(http.StatusBadRequest, httpresponse.Errorf("cannot wait for interaction '%s', interaction not found.", waitFor))
 		}
@@ -194,10 +174,10 @@ func interactionsWaitHandler(c echo.Context) error {
 				return true
 			}
 			if timeLeft > 0 {
-				cc.notify.Wait(timeLeft)
+				a.notify.Wait(timeLeft)
 			}
 			return false
-		}, cc.delay, cc.duration)
+		}, a.delay, a.duration)
 
 		if !interaction.HasRequests(waitForCount) {
 			return c.JSON(http.StatusRequestTimeout, httpresponse.Error("timeout waiting for interactions to be met"))
@@ -208,17 +188,17 @@ func interactionsWaitHandler(c echo.Context) error {
 
 	log.Info("waiting for all")
 	retryFor(func(timeLeft time.Duration) bool {
-		if cc.interactions.AllHaveRequests() {
+		if a.interactions.AllHaveRequests() {
 			return true
 		}
 		if timeLeft > 0 {
-			cc.notify.Wait(timeLeft)
+			a.notify.Wait(timeLeft)
 		}
 		return false
-	}, cc.delay, cc.duration)
+	}, a.delay, a.duration)
 
-	if !cc.interactions.AllHaveRequests() {
-		for _, i := range cc.interactions.All() {
+	if !a.interactions.AllHaveRequests() {
+		for _, i := range a.interactions.All() {
 			if !i.HasRequests(1) {
 				log.Infof("'%s' has no requests", i.Description)
 			}
@@ -229,12 +209,11 @@ func interactionsWaitHandler(c echo.Context) error {
 	return c.NoContent(http.StatusOK)
 }
 
-func indexHandler(c echo.Context) error {
-	cc := c.(*ProxyContext)
-	req := cc.Request()
+func (a *api) indexHandler(c echo.Context) error {
+	req := c.Request()
 	log.Infof("proxying %s %s", req.Method, req.URL.Path)
 
-	mediaType, err := parseMediaTypeHeader(cc.Request().Header)
+	mediaType, err := parseMediaTypeHeader(c.Request().Header)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, httpresponse.Errorf("failed to parse Content-Type header. %s", err.Error()))
 	}
@@ -244,7 +223,7 @@ func indexHandler(c echo.Context) error {
 		return c.JSON(http.StatusUnsupportedMediaType, httpresponse.Errorf("unsupported Media Type: %s", mediaType))
 	}
 
-	allInteractions, ok := cc.interactions.FindAll(req.URL.Path, req.Method)
+	allInteractions, ok := a.interactions.FindAll(req.URL.Path, req.Method)
 	if !ok {
 		return c.JSON(http.StatusBadRequest, httpresponse.Errorf("unable to find interaction to Match '%s %s'", req.Method, req.URL.Path))
 	}
@@ -254,19 +233,19 @@ func indexHandler(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, httpresponse.Errorf("unable to read requestDocument data. %s", err.Error()))
 	}
 
-	err = cc.Request().Body.Close()
+	err = c.Request().Body.Close()
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, httpresponse.Error(err.Error()))
 	}
 
-	cc.Request().Body = ioutil.NopCloser(bytes.NewBuffer(data))
+	c.Request().Body = ioutil.NopCloser(bytes.NewBuffer(data))
 
-	request, err := parseRequest(data, cc.Request().URL)
+	request, err := parseRequest(data, c.Request().URL)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, httpresponse.Errorf("unable to read requestDocument data. %s", err.Error()))
 	}
 	h := make(map[string]interface{})
-	for headerName, headerValues := range cc.Request().Header {
+	for headerName, headerValues := range c.Request().Header {
 		for _, headerValue := range headerValues {
 			h[headerName] = headerValue
 		}
@@ -276,7 +255,7 @@ func indexHandler(c echo.Context) error {
 	unmatched := make(map[string][]string)
 	matched := make([]*interaction, 0)
 	for _, interaction := range allInteractions {
-		ok, info := interaction.EvaluateConstrains(request, cc.interactions)
+		ok, info := interaction.EvaluateConstrains(request, a.interactions)
 		if ok {
 			interaction.StoreRequest(request)
 			matched = append(matched, interaction)
@@ -293,8 +272,8 @@ func indexHandler(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, httpresponse.Error("constraints do not match"))
 	}
 
-	cc.notify.Notify()
-	cc.proxy.ServeHTTP(&ResponseModificationWriter{res: cc.Response(), interactions: matched}, req)
+	a.notify.Notify()
+	a.proxy.ServeHTTP(&ResponseModificationWriter{res: c.Response(), interactions: matched}, req)
 	return nil
 }
 

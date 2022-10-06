@@ -12,21 +12,11 @@ import (
 
 func TestInteractionsWaitHandler(t *testing.T) {
 	r := require.New(t)
-	cc := &ProxyContext{
-		// target:       target,
-		// proxy:        proxy,
-		interactions: &Interactions{},
-		notify:       NewNotify(),
-		delay:        20 * time.Millisecond,
-		duration:     150 * time.Millisecond,
+	a := api{
+		notify:   NewNotify(),
+		delay:    20 * time.Millisecond,
+		duration: 150 * time.Millisecond,
 	}
-
-	// api := api{
-	// 	interactions: &Interactions{},
-	// 	notify:       NewNotify(),
-	// 	delay:        20 * time.Millisecond,
-	// 	duration:     150 * time.Millisecond,
-	// }
 
 	for _, tt := range []struct {
 		name         string
@@ -74,10 +64,10 @@ func TestInteractionsWaitHandler(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			rec := httptest.NewRecorder()
 			e := echo.New()
-			cc.Context = e.NewContext(tt.req, rec)
-			cc.interactions = tt.interactions
+			c := e.NewContext(tt.req, rec)
+			a.interactions = tt.interactions
 
-			r.NotPanics(func() { interactionsWaitHandler(cc) })
+			r.NotPanics(func() { a.interactionsWaitHandler(c) })
 			r.Equal(tt.code, rec.Code)
 		})
 	}
