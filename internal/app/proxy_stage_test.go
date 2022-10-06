@@ -17,12 +17,12 @@ import (
 	"github.com/form3tech-oss/pact-proxy/pkg/pactproxy"
 	"github.com/pact-foundation/pact-go/dsl"
 	"github.com/pkg/errors"
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/assert"
 )
 
 type ProxyStage struct {
 	t                     *testing.T
-	require               *require.Assertions
+	assert                *assert.Assertions
 	pact                  *dsl.Pact
 	proxy                 *pactproxy.PactProxy
 	contentTypeConstraint string
@@ -50,7 +50,7 @@ func NewProxyStage(t *testing.T) (*ProxyStage, *ProxyStage, *ProxyStage) {
 
 	s := &ProxyStage{
 		t:            t,
-		require:      require.New(t),
+		assert:       assert.New(t),
 		proxy:        proxy,
 		pact:         pact,
 		modifiedBody: make(map[string]interface{}),
@@ -330,15 +330,15 @@ func (s *ProxyStage) n_requests_are_sent_using_the_body_and_content_type(n int, 
 
 func (s *ProxyStage) send_post_request_and_collect_response(body, url, contentType string) error {
 	req, err := http.NewRequest("POST", url, strings.NewReader(body))
-	s.require.NoError(err, "request creation failed")
+	s.assert.NoError(err, "request creation failed")
 
 	req.Header.Set("Content-Type", contentType)
 	res, err := http.DefaultClient.Do(req)
-	s.require.NoError(err, "sending request failed")
+	s.assert.NoError(err, "sending request failed")
 
 	s.responses = append(s.responses, res)
 	bodyBytes, err := io.ReadAll(res.Body)
-	s.require.NoError(err, "unable to read response body")
+	s.assert.NoError(err, "unable to read response body")
 	s.responseBodies = append(s.responseBodies, bodyBytes)
 	return nil
 }
@@ -351,34 +351,44 @@ func (s *ProxyStage) multiple_requests_are_sent(requestsToSend int32) {
 			for i := int32(0); i < requestsToSend; i++ {
 				u := fmt.Sprintf("http://localhost:%s/users", proxyURL.Port())
 				req, err := http.NewRequest("POST", u, strings.NewReader(`{"name":"test"}`))
-				s.require.NoError(err)
+				s.assert.NoError(err)
 
 				req.Header.Set("Content-Type", "application/json")
 				atomic.AddInt32(&s.requestsSent, 1)
 				_, err = http.DefaultClient.Do(req)
-				s.require.NoError(err)
+				s.assert.NoError(err)
+				// s.t.Fatal("oops") // This exits the inner func instead of TestFoo.
+				// fatal(s)
+			}
+		}()
+
+		go func() {
+			x := 1
+			if x == 1 {
+				//s.t.Fatal("oops") // This exits the inner func instead of TestFoo.
+				s.assert.Equal(x, 1)
 			}
 		}()
 
 		err = s.proxy.WaitForInteraction(s.pactName, int(requestsToSend))
-		s.require.NoError(err)
+		s.assert.NoError(err)
 		return nil
 	})
 }
 
 func (s *ProxyStage) pact_verification_is_successful() *ProxyStage {
-	s.require.Nil(s.pactResult)
+	s.assert.Nil(s.pactResult)
 	return s
 }
 
 func (s *ProxyStage) pact_verification_is_not_successful() *ProxyStage {
-	s.require.NotNil(s.pactResult, "pact verification did not fail")
+	s.assert.NotNil(s.pactResult, "pact verification did not fail")
 	return s
 }
 
 func (s *ProxyStage) the_proxy_waits_for_all_requests() *ProxyStage {
 	sent := atomic.LoadInt32(&s.requestsSent)
-	s.require.Equal(s.requestsToSend, sent, "proxy did not wait for requests")
+	s.assert.Equal(s.requestsToSend, sent, "proxy did not wait for requests")
 	return s
 }
 
@@ -393,40 +403,40 @@ func (s *ProxyStage) the_response_name_is_(name string) *ProxyStage {
 }
 
 func (s *ProxyStage) the_nth_response_is_(n, statusCode int) *ProxyStage {
-	s.require.GreaterOrEqual(len(s.responses), n, "number of responses is less than expected")
-	s.require.Equalf(statusCode, s.responses[n-1].StatusCode, "Expected status code on attempt %d: %d, got : %d", n, statusCode, s.responses[n-1].StatusCode)
+	s.assert.GreaterOrEqual(len(s.responses), n, "number of responses is less than expected")
+	s.assert.Equalf(statusCode, s.responses[n-1].StatusCode, "Expected status code on attempt %d: %d, got : %d", n, statusCode, s.responses[n-1].StatusCode)
 	return s
 }
 
 func (s *ProxyStage) the_nth_response_name_is_(n int, name string) *ProxyStage {
-	s.require.GreaterOrEqual(len(s.responses), n, "number of responses is less than expected")
+	s.assert.GreaterOrEqual(len(s.responses), n, "number of responses is less than expected")
 
 	var body map[string]string
 	err := json.Unmarshal(s.responseBodies[n-1], &body)
-	s.require.NoError(err, "unable to parse response body, %v", err)
-	s.require.Equalf(name, body["name"], "Expected name on attempt %d,: %s, got: %s", n, name, body["name"])
+	s.assert.NoError(err, "unable to parse response body, %v", err)
+	s.assert.Equalf(name, body["name"], "Expected name on attempt %d,: %s, got: %s", n, name, body["name"])
 	return s
 }
 
 func (s *ProxyStage) the_nth_response_age_is_(n int, age int64) *ProxyStage {
-	s.require.GreaterOrEqual(len(s.responses), n, "number of responses is less than expected")
+	s.assert.GreaterOrEqual(len(s.responses), n, "number of responses is less than expected")
 
 	var body map[string]int64
 	err := json.Unmarshal(s.responseBodies[n-1], &body)
-	s.require.NoError(err, "unable to parse response body")
+	s.assert.NoError(err, "unable to parse response body")
 
-	s.require.Equalf(age, body["age"], "Expected name on attempt %d,: %d, got: %d", n, age, body["age"])
+	s.assert.Equalf(age, body["age"], "Expected name on attempt %d,: %d, got: %d", n, age, body["age"])
 
 	return s
 }
 
 func (s *ProxyStage) the_nth_response_body_has_(n int, key, value string) *ProxyStage {
-	s.require.GreaterOrEqual(len(s.responseBodies), n, "number of request bodies is les than expected")
+	s.assert.GreaterOrEqual(len(s.responseBodies), n, "number of request bodies is les than expected")
 
 	var responseBody map[string]string
 	err := json.Unmarshal(s.responseBodies[n-1], &responseBody)
-	s.require.NoError(err, "unable to parse response body, %v", err)
-	s.require.Equalf(value, responseBody[key], "Expected %s on attempt %d,: %s, got: %s", key, n, value, responseBody[key])
+	s.assert.NoError(err, "unable to parse response body, %v", err)
+	s.assert.Equalf(value, responseBody[key], "Expected %s on attempt %d,: %s, got: %s", key, n, value, responseBody[key])
 	return s
 }
 
@@ -439,28 +449,28 @@ func (s *ProxyStage) the_response_body_to_plain_text_request_is_correct() *Proxy
 }
 
 func (s *ProxyStage) the_nth_response_body_is(n int, data []byte) *ProxyStage {
-	s.require.GreaterOrEqual(len(s.responseBodies), n, "number of request bodies is les than expected")
+	s.assert.GreaterOrEqual(len(s.responseBodies), n, "number of request bodies is les than expected")
 
 	body := s.responseBodies[n-1]
 	c := bytes.Compare(body, data)
-	s.require.Equal(0, c, "Expected body did not match")
+	s.assert.Equal(0, c, "Expected body did not match")
 	return s
 }
 
 func (s *ProxyStage) n_responses_were_received(n int) *ProxyStage {
-	s.require.Len(s.responses, n)
+	s.assert.Len(s.responses, n)
 	return s
 }
 
 func (s *ProxyStage) pact_can_be_generated() {
 	u := fmt.Sprintf("http://localhost:%s/pact", proxyURL.Port())
 	req, err := http.NewRequestWithContext(context.Background(), "POST", u, bytes.NewReader([]byte("{\"pact_specification_version\":\"3.0.0\"}")))
-	s.require.NoError(err)
+	s.assert.NoError(err)
 
 	req.Header.Add("X-Pact-Mock-Service", "true")
 	req.Header.Add("Content-Type", "application/json")
 	resp, err := http.DefaultClient.Do(req)
-	s.require.NoError(err)
+	s.assert.NoError(err)
 	defer resp.Body.Close()
-	s.require.Equal(http.StatusOK, resp.StatusCode, "Expected 200 but returned %d status code", resp.StatusCode)
+	s.assert.Equal(http.StatusOK, resp.StatusCode, "Expected 200 but returned %d status code", resp.StatusCode)
 }

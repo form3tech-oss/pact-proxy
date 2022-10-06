@@ -32,7 +32,7 @@ func (conf *ProxyConfiguration) SetupProxy(serverAddress, targetAddress string) 
 		Target:        targetAddress,
 	}
 
-	content, err := json.Marshal(config)
+	content, _ := json.Marshal(config)
 
 	req, err := http.NewRequest("POST", strings.TrimSuffix(conf.url, "/")+"/proxies", bytes.NewReader(content))
 	if err != nil {
