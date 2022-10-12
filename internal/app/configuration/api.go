@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/form3tech-oss/pact-proxy/internal/app/httpresponse"
+	"github.com/form3tech-oss/pact-proxy/internal/app/pactproxy"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -42,12 +43,13 @@ func adminHandler(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		proxyConfig := ProxyConfig{}
+		proxyConfig := pactproxy.Config{}
 		err = json.Unmarshal(configBytes, &proxyConfig)
 		if err != nil {
 			httpresponse.Errorf(w, http.StatusBadRequest, "unable to parse interactionConstraint from data. %s", err.Error())
 			return
 		}
+		proxyConfig.SetDefaults()
 
 		log.Infof("setting up proxy from %s to %s", proxyConfig.ServerAddress, proxyConfig.Target)
 
