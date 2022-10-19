@@ -357,16 +357,6 @@ func (s *ProxyStage) multiple_requests_are_sent(requestsToSend int32) {
 				atomic.AddInt32(&s.requestsSent, 1)
 				_, err = http.DefaultClient.Do(req)
 				s.assert.NoError(err)
-				// s.t.Fatal("oops") // This exits the inner func instead of TestFoo.
-				// fatal(s)
-			}
-		}()
-
-		go func() {
-			x := 1
-			if x == 1 {
-				//s.t.Fatal("oops") // This exits the inner func instead of TestFoo.
-				s.assert.Equal(x, 1)
 			}
 		}()
 

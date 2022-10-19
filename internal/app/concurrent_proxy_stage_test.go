@@ -11,7 +11,7 @@ import (
 	"github.com/form3tech-oss/pact-proxy/pkg/pactproxy"
 	"github.com/pact-foundation/pact-go/dsl"
 	log "github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/assert"
 )
 
 const (
@@ -21,7 +21,7 @@ const (
 
 type ConcurrentProxyStage struct {
 	t                                  *testing.T
-	require                            *require.Assertions
+	assert                             *assert.Assertions
 	proxy                              *pactproxy.PactProxy
 	pact                               *dsl.Pact
 	modifiedNameStatusCode             int
@@ -42,10 +42,10 @@ func NewConcurrentProxyStage(t *testing.T) (*ConcurrentProxyStage, *ConcurrentPr
 	}
 
 	s := &ConcurrentProxyStage{
-		t:       t,
-		require: require.New(t),
-		pact:    pact,
-		proxy:   proxy,
+		t:      t,
+		assert: assert.New(t),
+		pact:   pact,
+		proxy:  proxy,
 	}
 
 	t.Cleanup(func() {
@@ -147,28 +147,28 @@ func (s *ConcurrentProxyStage) the_concurrent_requests_are_sent() {
 		return nil
 	})
 
-	s.require.NoError(err)
+	s.assert.NoError(err)
 }
 
 func (s *ConcurrentProxyStage) makeUserRequest() {
 	u := fmt.Sprintf("http://localhost:%s/users", proxyURL.Port())
 	req, err := http.NewRequest("POST", u, strings.NewReader(`{"name":"jim"}`))
-	s.require.NoError(err)
+	s.assert.NoError(err)
 
 	req.Header.Set("Content-Type", "application/json")
 	res, err := http.DefaultClient.Do(req)
-	s.require.NoError(err)
+	s.assert.NoError(err)
 	s.userResponses = append(s.userResponses, res)
 }
 
 func (s *ConcurrentProxyStage) makeAddressRequest() {
 	u := fmt.Sprintf("http://localhost:%s/addresses", proxyURL.Port())
 	req, err := http.NewRequest("POST", u, strings.NewReader(`{"address":"test"}`))
-	s.require.NoError(err)
+	s.assert.NoError(err)
 
 	req.Header.Set("Content-Type", "application/json")
 	res, err := http.DefaultClient.Do(req)
-	s.require.NoError(err)
+	s.assert.NoError(err)
 	s.addressResponses = append(s.addressResponses, res)
 }
 
@@ -197,10 +197,10 @@ func sendConcurrentRequests(requests int, d time.Duration, f func()) {
 
 func (s *ConcurrentProxyStage) all_the_user_responses_should_have_the_right_status_code() *ConcurrentProxyStage {
 	expectedLen := s.concurrentUserRequestsPerSecond * int(s.concurrentUserRequestsDuration/time.Second)
-	s.require.Len(s.userResponses, expectedLen, "number of user responses is not as expected")
+	s.assert.Len(s.userResponses, expectedLen, "number of user responses is not as expected")
 
 	for _, res := range s.userResponses {
-		s.require.Equal(res.StatusCode, s.modifiedNameStatusCode, "expected user status code")
+		s.assert.Equal(res.StatusCode, s.modifiedNameStatusCode, "expected user status code")
 	}
 
 	return s
@@ -208,10 +208,10 @@ func (s *ConcurrentProxyStage) all_the_user_responses_should_have_the_right_stat
 
 func (s *ConcurrentProxyStage) all_the_address_responses_should_have_the_right_status_code() *ConcurrentProxyStage {
 	expectedLen := s.concurrentAddressRequestsPerSecond * int(s.concurrentAddressRequestsDuration/time.Second)
-	s.require.Len(s.addressResponses, expectedLen, "number of address responses is not as expected")
+	s.assert.Len(s.addressResponses, expectedLen, "number of address responses is not as expected")
 
 	for _, res := range s.addressResponses {
-		s.require.Equal(res.StatusCode, s.modifiedAddressStatusCode, "expected address status code")
+		s.assert.Equal(res.StatusCode, s.modifiedAddressStatusCode, "expected address status code")
 	}
 
 	return s
@@ -219,14 +219,14 @@ func (s *ConcurrentProxyStage) all_the_address_responses_should_have_the_right_s
 
 func (s *ConcurrentProxyStage) the_proxy_waits_for_all_user_responses() *ConcurrentProxyStage {
 	want := s.concurrentUserRequestsPerSecond * int(s.concurrentUserRequestsDuration/time.Second)
-	s.require.Len(s.userResponses, want, "number of user responses is not as expected")
+	s.assert.Len(s.userResponses, want, "number of user responses is not as expected")
 
 	return s
 }
 
 func (s *ConcurrentProxyStage) the_proxy_waits_for_all_address_responses() *ConcurrentProxyStage {
 	want := s.concurrentAddressRequestsPerSecond * int(s.concurrentAddressRequestsDuration/time.Second)
-	s.require.Len(s.addressResponses, want, "number of address responses is not as expected")
+	s.assert.Len(s.addressResponses, want, "number of address responses is not as expected")
 
 	return s
 }
