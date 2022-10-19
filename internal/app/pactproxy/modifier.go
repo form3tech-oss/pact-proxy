@@ -54,7 +54,7 @@ func (ims *interactionModifiers) Modifiers() []*interactionModifier {
 func (ims *interactionModifiers) modifyBody(b []byte) ([]byte, error) {
 	for _, m := range ims.Modifiers() {
 		if strings.HasPrefix(m.Path, "$.body.") {
-			if m.Attempt == nil || *m.Attempt == int(atomic.LoadInt32(&ims.interaction.requestCount)) {
+			if m.Attempt == nil || *m.Attempt == int(atomic.LoadInt32(&ims.interaction.RequestCount)) {
 				var err error
 				b, err = sjson.SetBytes(b, m.Path[7:], m.Value)
 				if err != nil {
@@ -69,7 +69,7 @@ func (ims *interactionModifiers) modifyBody(b []byte) ([]byte, error) {
 func (ims *interactionModifiers) modifyStatusCode() (bool, int) {
 	for _, m := range ims.Modifiers() {
 		if m.Path == "$.status" {
-			if m.Attempt == nil || *m.Attempt == int(atomic.LoadInt32(&ims.interaction.requestCount)) {
+			if m.Attempt == nil || *m.Attempt == int(atomic.LoadInt32(&ims.interaction.RequestCount)) {
 				code, err := strconv.Atoi(fmt.Sprintf("%v", m.Value))
 				if err == nil {
 					return true, code

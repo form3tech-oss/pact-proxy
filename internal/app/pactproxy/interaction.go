@@ -42,15 +42,17 @@ func (m *regexPathMatcher) match(val string) bool {
 }
 
 type interaction struct {
-	pathMatcher  pathMatcher
-	method       string
-	Alias        string
-	Description  string
-	definition   map[string]interface{}
-	constraints  sync.Map
-	Modifiers    *interactionModifiers
-	lastRequest  atomic.Value
-	requestCount int32
+	mu             sync.Mutex
+	pathMatcher    pathMatcher
+	Method         string                 `json:"method"`
+	Alias          string                 `json:"alias"`
+	Description    string                 `json:"description"`
+	Definition     map[string]interface{} `json:"definition"`
+	Constraints    sync.Map               `json:"constraints"`
+	Modifiers      *interactionModifiers  `json:"modifiers"`
+	RequestCount   int32                  `json:"request_count"`
+	RequestHistory []requestDocument      `json:"request_history"`
+	lastRequest    atomic.Value
 }
 
 func LoadInteraction(data []byte, alias string) (*interaction, error) {
@@ -91,9 +93,9 @@ func LoadInteraction(data []byte, alias string) (*interaction, error) {
 
 	interaction := &interaction{
 		pathMatcher: matcher,
-		method:      request["method"].(string),
+		Method:      request["method"].(string),
 		Alias:       alias,
-		definition:  definition,
+		Definition:  definition,
 		Description: description,
 	}
 
@@ -292,11 +294,11 @@ func (i *interaction) addTextConstraintsFromPact(matchingRules map[string]bool, 
 	}
 }
 func (i *interaction) Match(path, method string) bool {
-	return method == i.method && i.pathMatcher.match(path)
+	return method == i.Method && i.pathMatcher.match(path)
 }
 
 func (i *interaction) AddConstraint(constraint interactionConstraint) {
-	i.constraints.Store(constraint.Key(), constraint)
+	i.Constraints.Store(constraint.Key(), constraint)
 }
 
 func (i *interaction) loadValuesFromSource(constraint interactionConstraint, interactions *Interactions) ([]interface{}, error) {
@@ -322,7 +324,7 @@ func (i *interaction) EvaluateConstrains(request requestDocument, interactions *
 	result := true
 	violations := make([]string, 0)
 
-	i.constraints.Range(func(_, v interface{}) bool {
+	i.Constraints.Range(func(_, v interface{}) bool {
 		constraint := v.(interactionConstraint)
 		values := constraint.Values
 		if constraint.Source != "" {
@@ -362,9 +364,14 @@ func (i *interaction) EvaluateConstrains(request requestDocument, interactions *
 
 func (i *interaction) StoreRequest(request requestDocument) {
 	i.lastRequest.Store(request)
-	atomic.AddInt32(&i.requestCount, 1)
+	atomic.AddInt32(&i.RequestCount, 1)
+
+	// add to history array...
+	i.mu.Lock()
+	i.RequestHistory = append(i.RequestHistory, request)
+	i.mu.Unlock()
 }
 
 func (i *interaction) HasRequests(count int) bool {
-	return atomic.LoadInt32(&i.requestCount) >= int32(count)
+	return atomic.LoadInt32(&i.RequestCount) >= int32(count)
 }

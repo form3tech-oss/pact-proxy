@@ -3,7 +3,7 @@ package pactproxy
 import (
 	"bytes"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"mime"
 	"net/http"
 	"net/http/httputil"
@@ -71,7 +71,7 @@ func (a *api) readinessHandler(res http.ResponseWriter, req *http.Request) {
 }
 
 func (a *api) interactionsConstraintsHandler(res http.ResponseWriter, req *http.Request) {
-	constraintBytes, err := ioutil.ReadAll(req.Body)
+	constraintBytes, err := io.ReadAll(req.Body)
 	if err != nil {
 		httpresponse.Errorf(res, http.StatusBadRequest, "unable to read constraint. %s", err.Error())
 		return
@@ -94,7 +94,7 @@ func (a *api) interactionsConstraintsHandler(res http.ResponseWriter, req *http.
 }
 
 func (a *api) interactionsModifiersHandler(res http.ResponseWriter, req *http.Request) {
-	modifierBytes, err := ioutil.ReadAll(req.Body)
+	modifierBytes, err := io.ReadAll(req.Body)
 	if err != nil {
 		httpresponse.Errorf(res, http.StatusBadRequest, "unable to read modifier. %s", err.Error())
 		return
@@ -133,7 +133,7 @@ func (a *api) interactionsHandler(res http.ResponseWriter, req *http.Request) {
 	}
 
 	if req.Method == http.MethodPost {
-		data, err := ioutil.ReadAll(req.Body)
+		data, err := io.ReadAll(req.Body)
 		if err != nil {
 			httpresponse.Errorf(res, http.StatusBadRequest, "unable to read interaction. %s", err.Error())
 			return
@@ -159,7 +159,7 @@ func (a *api) interactionsHandler(res http.ResponseWriter, req *http.Request) {
 			return
 		}
 
-		req.Body = ioutil.NopCloser(bytes.NewBuffer(data))
+		req.Body = io.NopCloser(bytes.NewBuffer(data))
 
 		a.proxy.ServeHTTP(res, req)
 		return
@@ -178,7 +178,9 @@ func (a *api) interactionsHandler(res http.ResponseWriter, req *http.Request) {
 			}
 		}
 
-		resp := struct{ Interactions []*interaction `json:"interactions"` }{
+		resp := struct {
+			Interactions []*interaction `json:"interactions"`
+		}{
 			Interactions: interactions,
 		}
 
@@ -262,7 +264,7 @@ func (a *api) indexHandler(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	data, err := ioutil.ReadAll(req.Body)
+	data, err := io.ReadAll(req.Body)
 	if err != nil {
 		httpresponse.Errorf(res, http.StatusBadRequest, "unable to read requestDocument data. %s", err.Error())
 		return
@@ -274,7 +276,7 @@ func (a *api) indexHandler(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	req.Body = ioutil.NopCloser(bytes.NewBuffer(data))
+	req.Body = io.NopCloser(bytes.NewBuffer(data))
 
 	request, err := parseRequest(data, req.URL)
 	if err != nil {

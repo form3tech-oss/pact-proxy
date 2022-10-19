@@ -1,7 +1,7 @@
 package pactproxy
 
 import (
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -85,7 +85,7 @@ func TestInteractionsGetHandler(t *testing.T) {
 		interactions *Interactions
 		req          *http.Request
 		code         int
-		body string
+		body         string
 	}{
 		{
 			name:         "empty interactions",
@@ -101,10 +101,16 @@ func TestInteractionsGetHandler(t *testing.T) {
 			name: "interactions by alias",
 			interactions: func() *Interactions {
 				interactions := Interactions{}
-				interactions.Store(&interaction{
+				request := map[string]interface{}{
+					"body": map[string]interface{}{"foo": "bar"},
+					"path": "/test",
+				}
+				i := interaction{
 					Alias:       "existing",
 					Description: "Existing",
-				})
+				}
+				i.StoreRequest(request)
+				interactions.Store(&i)
 				return &interactions
 			}(),
 			req: func() *http.Request {
@@ -112,6 +118,7 @@ func TestInteractionsGetHandler(t *testing.T) {
 				return req
 			}(),
 			code: http.StatusOK,
+			body: `{"interactions":[{"method":"","alias":"existing","description":"Existing","definition":null,"constraints":{},"modifiers":null,"request_count":1,"request_history":[{"body":{"foo":"bar"},"path":"/test"}]}]}`,
 		},
 		{
 			name: "interactions by alias",
@@ -128,6 +135,7 @@ func TestInteractionsGetHandler(t *testing.T) {
 				return req
 			}(),
 			code: http.StatusOK,
+			body: `{"interactions":null}`,
 		},
 	} {
 		tt := tt
@@ -139,9 +147,9 @@ func TestInteractionsGetHandler(t *testing.T) {
 			r.Equal(tt.code, rec.Code)
 			body := rec.Result().Body
 			defer body.Close()
-			data , err := ioutil.ReadAll(body)
+			data, err := io.ReadAll(body)
 			r.NoError(err)
-			r.Equal(tt.body, string(data))
+			r.Equal(tt.body+"\n", string(data))
 		})
 	}
 }

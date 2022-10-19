@@ -2,9 +2,10 @@ package pactproxy
 
 import (
 	"encoding/json"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestLoadInteractionPlainTextConstraints(t *testing.T) {
@@ -109,7 +110,7 @@ func TestLoadInteractionPlainTextConstraints(t *testing.T) {
 			require.Equalf(t, tt.wantErr, err != nil, "error %v", err)
 
 			var gotConstraint interactionConstraint
-			got.constraints.Range(func(key, value interface{}) bool {
+			got.Constraints.Range(func(key, value interface{}) bool {
 				var present bool
 				gotConstraint, present = value.(interactionConstraint)
 				return present
@@ -244,7 +245,7 @@ func TestV3MatchingRulesLeadToCorrectConstraints(t *testing.T) {
 			require.Equalf(t, tt.wantErr, err != nil, "error %v", err)
 
 			var gotConstraint interactionConstraint
-			got.constraints.Range(func(key, value interface{}) bool {
+			got.Constraints.Range(func(key, value interface{}) bool {
 				var present bool
 				gotConstraint, present = value.(interactionConstraint)
 				return present
