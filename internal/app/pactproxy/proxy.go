@@ -2,6 +2,7 @@ package pactproxy
 
 import (
 	"bytes"
+	"encoding/json"
 	"io/ioutil"
 	"mime"
 	"net/http"
@@ -162,6 +163,28 @@ func (a *api) interactionsHandler(res http.ResponseWriter, req *http.Request) {
 
 		a.proxy.ServeHTTP(res, req)
 		return
+	}
+
+	if req.Method == http.MethodGet {
+		alias := req.URL.Query().Get("alias")
+
+		var interactions []*interaction
+		if alias == "" {
+			interactions = a.interactions.All()
+		} else {
+			interaction, found := a.interactions.Load(alias)
+			if found {
+				interactions = append(interactions, interaction)
+			}
+		}
+
+		resp := struct{ Interactions []*interaction `json:"interactions"` }{
+			Interactions: interactions,
+		}
+
+		if err := json.NewEncoder(res).Encode(resp); err != nil {
+			res.WriteHeader(http.StatusInternalServerError)
+		}
 	}
 }
 
