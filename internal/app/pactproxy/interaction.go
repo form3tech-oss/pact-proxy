@@ -8,7 +8,6 @@ import (
 	"regexp"
 	"strings"
 	"sync"
-	"sync/atomic"
 
 	log "github.com/sirupsen/logrus"
 
@@ -42,15 +41,16 @@ func (m *regexPathMatcher) match(val string) bool {
 }
 
 type interaction struct {
+	mu           sync.RWMutex
 	pathMatcher  pathMatcher
 	method       string
 	Alias        string
 	Description  string
 	definition   map[string]interface{}
-	constraints  sync.Map
+	constraints  map[string]interactionConstraint
 	Modifiers    *interactionModifiers
-	lastRequest  atomic.Value
-	requestCount int32
+	lastRequest  requestDocument
+	requestCount int
 }
 
 func LoadInteraction(data []byte, alias string) (*interaction, error) {
@@ -95,11 +95,12 @@ func LoadInteraction(data []byte, alias string) (*interaction, error) {
 		Alias:       alias,
 		definition:  definition,
 		Description: description,
+		constraints: map[string]interactionConstraint{},
 	}
 
 	interaction.Modifiers = &interactionModifiers{
 		interaction: interaction,
-		modifiers:   sync.Map{},
+		modifiers:   map[string]*interactionModifier{},
 	}
 
 	requestBody, ok := request["body"]
@@ -296,7 +297,9 @@ func (i *interaction) Match(path, method string) bool {
 }
 
 func (i *interaction) AddConstraint(constraint interactionConstraint) {
-	i.constraints.Store(constraint.Key(), constraint)
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	i.constraints[constraint.Key()] = constraint
 }
 
 func (i *interaction) loadValuesFromSource(constraint interactionConstraint, interactions *Interactions) ([]interface{}, error) {
@@ -306,8 +309,10 @@ func (i *interaction) loadValuesFromSource(constraint interactionConstraint, int
 		return nil, errors.Errorf("cannot find source interaction '%s' for constraint", constraint.Source)
 	}
 
-	sourceRequest, ok := sourceInteraction.lastRequest.Load().(requestDocument)
-	if !ok {
+	i.mu.RLock()
+	sourceRequest := sourceInteraction.lastRequest
+	i.mu.RUnlock()
+	if len(sourceRequest) == 0 {
 		return nil, errors.Errorf("source interaction '%s' as no requests", constraint.Source)
 	}
 
@@ -322,8 +327,9 @@ func (i *interaction) EvaluateConstrains(request requestDocument, interactions *
 	result := true
 	violations := make([]string, 0)
 
-	i.constraints.Range(func(_, v interface{}) bool {
-		constraint := v.(interactionConstraint)
+	i.mu.RLock()
+	defer i.mu.RUnlock()
+	for _, constraint := range i.constraints {
 		values := constraint.Values
 		if constraint.Source != "" {
 			var err error
@@ -331,7 +337,7 @@ func (i *interaction) EvaluateConstrains(request requestDocument, interactions *
 			if err != nil {
 				violations = append(violations, err.Error())
 				result = false
-				return true
+				continue
 			}
 		}
 
@@ -342,7 +348,7 @@ func (i *interaction) EvaluateConstrains(request requestDocument, interactions *
 		}
 		if reflect.TypeOf(val) == reflect.TypeOf([]interface{}{}) {
 			log.Infof("skipping matching on interface{} type for path '%s'", constraint.Path)
-			return true
+			continue
 		}
 		if err == nil {
 			actual = fmt.Sprintf("%v", val)
@@ -353,18 +359,24 @@ func (i *interaction) EvaluateConstrains(request requestDocument, interactions *
 			violations = append(violations, fmt.Sprintf("value '%s' at path '%s' does not match constraint '%s'", actual, constraint.Path, expected))
 			result = false
 		}
-
-		return true
-	})
+	}
 
 	return result, violations
 }
 
 func (i *interaction) StoreRequest(request requestDocument) {
-	i.lastRequest.Store(request)
-	atomic.AddInt32(&i.requestCount, 1)
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	i.lastRequest = request
+	i.requestCount++
 }
 
 func (i *interaction) HasRequests(count int) bool {
-	return atomic.LoadInt32(&i.requestCount) >= int32(count)
+	return i.getRequestCount() >= count
+}
+
+func (i *interaction) getRequestCount() int {
+	i.mu.RLock()
+	defer i.mu.RUnlock()
+	return i.requestCount
 }
