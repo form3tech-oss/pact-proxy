@@ -105,18 +105,17 @@ func TestLoadInteractionPlainTextConstraints(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := LoadInteraction(tt.interaction, "alias")
+			interaction, err := LoadInteraction(tt.interaction, "alias")
 
 			require.Equalf(t, tt.wantErr, err != nil, "error %v", err)
 
-			var gotConstraint interactionConstraint
-			got.Constraints.Range(func(key, value interface{}) bool {
-				var present bool
-				gotConstraint, present = value.(interactionConstraint)
-				return present
-			})
+			var foundConstraint interactionConstraint
+			for _, constraint := range interaction.Constraints {
+				foundConstraint = constraint
+				break
+			}
 
-			assert.EqualValues(t, tt.wantConstraint, gotConstraint)
+			assert.EqualValues(t, tt.wantConstraint, foundConstraint)
 		})
 	}
 }
@@ -240,18 +239,17 @@ func TestV3MatchingRulesLeadToCorrectConstraints(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := LoadInteraction(tt.interaction, "alias")
+			interaction, err := LoadInteraction(tt.interaction, "alias")
 
 			require.Equalf(t, tt.wantErr, err != nil, "error %v", err)
 
-			var gotConstraint interactionConstraint
-			got.Constraints.Range(func(key, value interface{}) bool {
-				var present bool
-				gotConstraint, present = value.(interactionConstraint)
-				return present
-			})
+			var foundConstraint interactionConstraint
+			for _, constraint := range interaction.Constraints {
+				foundConstraint = constraint
+				break
+			}
 
-			assert.EqualValues(t, tt.wantConstraint, gotConstraint)
+			assert.EqualValues(t, tt.wantConstraint, foundConstraint)
 		})
 	}
 }

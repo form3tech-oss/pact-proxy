@@ -27,12 +27,13 @@ var supportedMediaTypes = map[string]func([]byte, *url.URL) (requestDocument, er
 }
 
 type api struct {
-	target       *url.URL
-	proxy        *httputil.ReverseProxy
-	interactions *Interactions
-	notify       *notify
-	delay        time.Duration
-	duration     time.Duration
+	target        *url.URL
+	proxy         *httputil.ReverseProxy
+	interactions  *Interactions
+	notify        *notify
+	delay         time.Duration
+	duration      time.Duration
+	recordHistory bool
 	echo.Context
 }
 
@@ -145,6 +146,7 @@ func (a *api) interactionsPostHandler(c echo.Context) error {
 		log.Infof("storing interaction '%s'", interaction.Description)
 	}
 
+	interaction.recordHistory = a.recordHistory
 	a.interactions.Store(interaction)
 
 	err = c.Request().Body.Close()

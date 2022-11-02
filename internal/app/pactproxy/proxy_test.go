@@ -4,6 +4,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -47,10 +48,7 @@ func TestInteractionsWaitHandler(t *testing.T) {
 			name: "timing out existing interaction",
 			interactions: func() *Interactions {
 				interactions := Interactions{}
-				interactions.Store(&interaction{
-					Alias:       "existing",
-					Description: "Existing",
-				})
+				interactions.Store(newInteraction("existing"))
 				return &interactions
 			}(),
 			req: func() *http.Request {
@@ -108,12 +106,9 @@ func TestInteractionsGetHandler(t *testing.T) {
 					"body": map[string]interface{}{"foo": "bar"},
 					"path": "/test",
 				}
-				i := interaction{
-					Alias:       "existing",
-					Description: "Existing",
-				}
+				i := newInteraction("existing")
 				i.StoreRequest(request)
-				interactions.Store(&i)
+				interactions.Store(i)
 				return &interactions
 			}(),
 			req: func() *http.Request {
@@ -121,16 +116,13 @@ func TestInteractionsGetHandler(t *testing.T) {
 				return req
 			}(),
 			code: http.StatusOK,
-			body: `{"interactions":[{"method":"","alias":"existing","description":"Existing","definition":null,"constraints":{},"modifiers":null,"request_count":1,"request_history":[{"body":{"foo":"bar"},"path":"/test"}]}]}`,
+			body: `{"interactions":[{"method":"","alias":"existing","description":"Existing","definition":null,"constraints":{},"modifiers":{},"request_count":1,"request_history":[{"body":{"foo":"bar"},"path":"/test"}]}]}`,
 		},
 		{
 			name: "interactions by alias",
 			interactions: func() *Interactions {
 				interactions := Interactions{}
-				interactions.Store(&interaction{
-					Alias:       "existing",
-					Description: "Existing",
-				})
+				interactions.Store(newInteraction("existing"))
 				return &interactions
 			}(),
 			req: func() *http.Request {
@@ -157,4 +149,18 @@ func TestInteractionsGetHandler(t *testing.T) {
 			r.Equal(tt.body+"\n", string(data))
 		})
 	}
+}
+
+func newInteraction(alias string) *interaction {
+	i := &interaction{
+		Alias:         alias,
+		Description:   strings.Title(alias),
+		Constraints:   map[string]interactionConstraint{},
+		recordHistory: true,
+	}
+	i.Modifiers = &interactionModifiers{
+		interaction: i,
+		modifiers:   map[string]*interactionModifier{},
+	}
+	return i
 }
