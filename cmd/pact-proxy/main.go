@@ -12,7 +12,10 @@ import (
 )
 
 func main() {
-	config := configuration.NewFromEnv()
+	config, err := configuration.NewFromEnv()
+	if err != nil {
+		log.WithError(err).Fatal("unable to load configuration")
+	}
 	for _, proxy := range config.Proxies {
 		log.Infof("setting up proxy for %s", proxy)
 		if err := configuration.ConfigureProxy(pactproxy.Config{Target: proxy}); err != nil {

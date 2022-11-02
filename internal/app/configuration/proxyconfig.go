@@ -4,19 +4,19 @@ import (
 	"context"
 
 	"github.com/form3tech-oss/pact-proxy/internal/app/pactproxy"
+	"github.com/pkg/errors"
 	"github.com/sethvargo/go-envconfig"
-	log "github.com/sirupsen/logrus"
 )
 
-func NewFromEnv() pactproxy.Config {
+func NewFromEnv() (pactproxy.Config, error) {
 	ctx := context.Background()
 
 	var config pactproxy.Config
 	err := envconfig.Process(ctx, &config)
 	if err != nil {
-		log.Fatal(err.Error())
+		return config, errors.Wrap(err, "process env config")
 	}
-	return config
+	return config, nil
 }
 
 func ConfigureProxy(config pactproxy.Config) error {
