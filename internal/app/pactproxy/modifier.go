@@ -1,14 +1,12 @@
 package pactproxy
 
 import (
-	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 
-	"github.com/pkg/errors"
 	"github.com/tidwall/sjson"
 )
 
@@ -22,16 +20,6 @@ type interactionModifier struct {
 type interactionModifiers struct {
 	interaction *interaction
 	modifiers   sync.Map
-}
-
-func loadModifier(data []byte) (*interactionModifier, error) {
-	modifier := &interactionModifier{}
-	err := json.Unmarshal(data, &modifier)
-	if err != nil {
-		return modifier, errors.Wrap(err, "unable to parse interactionModifier from data")
-	}
-
-	return modifier, nil
 }
 
 func (im *interactionModifier) Key() string {

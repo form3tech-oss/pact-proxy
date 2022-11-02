@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/form3tech-oss/pact-proxy/internal/app/httpresponse"
+	"github.com/labstack/echo/v4"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -33,37 +34,6 @@ var supportedMediaTypes = map[string]func([]byte, *url.URL) (requestDocument, er
 	mediaTypeText: ParsePlainTextRequest,
 }
 
-func StartProxy(server *http.ServeMux, config *Config) {
-	api := api{
-		target:       &config.Target,
-		proxy:        httputil.NewSingleHostReverseProxy(&config.Target),
-		interactions: &Interactions{},
-		notify:       NewNotify(),
-		delay:        config.WaitDelay,
-		duration:     config.WaitDuration,
-	}
-	if api.delay == 0 {
-		api.delay = defaultDelay
-	}
-	if api.duration == 0 {
-		api.duration = defaultDuration
-	}
-
-	for path, handler := range map[string]func(http.ResponseWriter, *http.Request){
-		"/ready":                     api.readinessHandler,
-		"/interactions/verification": api.proxyPassHandler,
-		"/pact":                      api.proxyPassHandler,
-		"/interactions/constraints":  api.interactionsConstraintsHandler,
-		"/interactions/modifiers":    api.interactionsModifiersHandler,
-		"/session":                   api.sessionHandler,
-		"/interactions":              api.interactionsHandler,
-		"/interactions/wait":         api.interactionsWaitHandler,
-		"/":                          api.indexHandler,
-	} {
-		server.HandleFunc(path, handler)
-	}
-}
-
 type api struct {
 	target       *url.URL
 	proxy        *httputil.ReverseProxy
@@ -71,125 +41,145 @@ type api struct {
 	notify       *notify
 	delay        time.Duration
 	duration     time.Duration
+	echo.Context
 }
 
-func (a *api) proxyPassHandler(res http.ResponseWriter, req *http.Request) {
-	a.proxy.ServeHTTP(res, req)
+func (a *api) ProxyRequest(c echo.Context) error {
+	a.proxy.ServeHTTP(c.Response(), c.Request())
+	return nil
 }
 
-func (a *api) readinessHandler(res http.ResponseWriter, req *http.Request) {
-	if req.Method != http.MethodGet {
-		res.WriteHeader(http.StatusMethodNotAllowed)
+func StartProxy(e *echo.Echo, config *Config) {
+
+	// Create these once at startup, thay are shared by all server threads
+	a := api{
+		target:       &config.Target,
+		proxy:        httputil.NewSingleHostReverseProxy(&config.Target),
+		interactions: &Interactions{},
+		notify:       NewNotify(),
+		delay:        config.WaitDelay,
+		duration:     config.WaitDuration,
 	}
-}
-
-func (a *api) interactionsConstraintsHandler(res http.ResponseWriter, req *http.Request) {
-	constraintBytes, err := ioutil.ReadAll(req.Body)
-	if err != nil {
-		httpresponse.Errorf(res, http.StatusBadRequest, "unable to read constraint. %s", err.Error())
-		return
+	if a.delay == 0 {
+		a.delay = defaultDelay
+	}
+	if a.duration == 0 {
+		a.duration = defaultDuration
 	}
 
-	constraint, err := LoadConstraint(constraintBytes)
+	e.GET("/ready", a.readinessHandler)
+
+	e.Any("/interactions/verification", a.proxyPassHandler)
+	e.Any("/pact", a.proxyPassHandler)
+
+	e.POST("/interactions/constraints", a.interactionsConstraintsHandler)
+	e.POST("/interactions/modifiers", a.interactionsModifiersHandler)
+
+	e.DELETE("/session", a.sessionHandler)
+
+	e.POST("/interactions", a.interactionsPostHandler)
+	e.DELETE("/interactions", a.interactionsDeleteHandler)
+
+	e.GET("/interactions/wait", a.interactionsWaitHandler)
+
+	e.Any("/*", a.indexHandler)
+}
+
+func (a *api) proxyPassHandler(c echo.Context) error {
+	return a.ProxyRequest(c)
+}
+
+func (a *api) readinessHandler(c echo.Context) error {
+	return c.NoContent(http.StatusOK)
+}
+
+func (a *api) interactionsConstraintsHandler(c echo.Context) error {
+	constraint := interactionConstraint{}
+	err := c.Bind(&constraint)
 	if err != nil {
-		httpresponse.Errorf(res, http.StatusBadRequest, "unable to load constraint. %s", err.Error())
-		return
+		return c.JSON(http.StatusBadRequest, httpresponse.Errorf("unable to load constraint. %s", err.Error()))
 	}
 
 	interaction, ok := a.interactions.Load(constraint.Interaction)
 	if !ok {
-		httpresponse.Errorf(res, http.StatusBadRequest, "unable to find interaction. %s", constraint.Interaction)
-		return
+		return c.JSON(http.StatusBadRequest, httpresponse.Errorf("unable to find interaction. %s", constraint.Interaction))
 	}
 
 	log.Infof("adding constraint to interaction '%s'", interaction.Description)
 	interaction.AddConstraint(constraint)
+
+	return c.NoContent(http.StatusOK)
 }
 
-func (a *api) interactionsModifiersHandler(res http.ResponseWriter, req *http.Request) {
-	modifierBytes, err := ioutil.ReadAll(req.Body)
+func (a *api) interactionsModifiersHandler(c echo.Context) error {
+	modifier := &interactionModifier{}
+	err := c.Bind(modifier)
 	if err != nil {
-		httpresponse.Errorf(res, http.StatusBadRequest, "unable to read modifier. %s", err.Error())
-		return
-	}
-
-	modifier, err := loadModifier(modifierBytes)
-	if err != nil {
-		httpresponse.Errorf(res, http.StatusBadRequest, "unable to load modifier. %s", err.Error())
-		return
+		return c.JSON(http.StatusBadRequest, httpresponse.Errorf("unable to load modifier. %s", err.Error()))
 	}
 
 	interaction, ok := a.interactions.Load(modifier.Interaction)
 	if !ok {
-		httpresponse.Errorf(res, http.StatusBadRequest, "unable to find interaction for modifier. %s", modifier.Interaction)
-		return
+		return c.JSON(http.StatusBadRequest, httpresponse.Errorf("unable to find interaction for modifier. %s", modifier.Interaction))
 	}
 
 	log.Infof("adding modifier to interaction '%s'", interaction.Description)
 	interaction.Modifiers.AddModifier(modifier)
+
+	return c.NoContent(http.StatusOK)
 }
 
-func (a *api) sessionHandler(res http.ResponseWriter, req *http.Request) {
-	if req.Method == http.MethodDelete {
-		log.Infof("deleting session for %s", a.target)
-		a.proxy.ServeHTTP(res, req)
-		return
-	}
+func (a *api) sessionHandler(c echo.Context) error {
+	log.Infof("deleting session for %s", a.target)
+	return a.ProxyRequest(c)
 }
 
-func (a *api) interactionsHandler(res http.ResponseWriter, req *http.Request) {
-	if req.Method == http.MethodDelete {
-		log.Info("deleting interactions")
-		a.proxy.ServeHTTP(res, req)
-		a.interactions.Clear()
-		return
-	}
-
-	if req.Method == http.MethodPost {
-		data, err := ioutil.ReadAll(req.Body)
-		if err != nil {
-			httpresponse.Errorf(res, http.StatusBadRequest, "unable to read interaction. %s", err.Error())
-			return
-		}
-
-		interaction, err := LoadInteraction(data, req.URL.Query().Get("alias"))
-		if err != nil {
-			httpresponse.Errorf(res, http.StatusBadRequest, "unable to load interaction. %s", err.Error())
-			return
-		}
-
-		if interaction.Alias != "" {
-			log.Infof("storing interaction '%s' (%s)", interaction.Description, interaction.Alias)
-		} else {
-			log.Infof("storing interaction '%s'", interaction.Description)
-		}
-
-		a.interactions.Store(interaction)
-
-		err = req.Body.Close()
-		if err != nil {
-			httpresponse.Errorf(res, http.StatusInternalServerError, err.Error())
-			return
-		}
-
-		req.Body = ioutil.NopCloser(bytes.NewBuffer(data))
-
-		a.proxy.ServeHTTP(res, req)
-		return
-	}
+func (a *api) interactionsDeleteHandler(c echo.Context) error {
+	log.Info("deleting interactions")
+	a.ProxyRequest(c)
+	a.interactions.Clear()
+	return nil
 }
 
-func (a *api) interactionsWaitHandler(res http.ResponseWriter, req *http.Request) {
-	waitForCount, err := strconv.Atoi(req.URL.Query().Get("count"))
+func (a *api) interactionsPostHandler(c echo.Context) error {
+	data, err := ioutil.ReadAll(c.Request().Body)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, httpresponse.Errorf("unable to read interaction. %s", err.Error()))
+	}
+
+	interaction, err := LoadInteraction(data, c.QueryParam("alias"))
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, httpresponse.Errorf("unable to load interaction. %s", err.Error()))
+	}
+
+	if interaction.Alias != "" {
+		log.Infof("storing interaction '%s' (%s)", interaction.Description, interaction.Alias)
+	} else {
+		log.Infof("storing interaction '%s'", interaction.Description)
+	}
+
+	a.interactions.Store(interaction)
+
+	err = c.Request().Body.Close()
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, httpresponse.Error(err.Error()))
+	}
+
+	c.Request().Body = ioutil.NopCloser(bytes.NewBuffer(data))
+
+	return a.ProxyRequest(c)
+}
+
+func (a *api) interactionsWaitHandler(c echo.Context) error {
+	waitForCount, err := strconv.Atoi(c.QueryParam("count"))
 	if err != nil {
 		waitForCount = 1
 	}
 
-	if waitFor := req.URL.Query().Get("interaction"); waitFor != "" {
+	if waitFor := c.QueryParam("interaction"); waitFor != "" {
 		interaction, ok := a.interactions.Load(waitFor)
 		if !ok {
-			httpresponse.Errorf(res, http.StatusBadRequest, "cannot wait for interaction '%s', interaction not found.", waitFor)
-			return
+			return c.JSON(http.StatusBadRequest, httpresponse.Errorf("cannot wait for interaction '%s', interaction not found.", waitFor))
 		}
 
 		log.WithField("wait_for", waitFor).Infof("waiting")
@@ -209,10 +199,10 @@ func (a *api) interactionsWaitHandler(res http.ResponseWriter, req *http.Request
 		}, a.delay, a.duration)
 
 		if !interaction.HasRequests(waitForCount) {
-			httpresponse.Error(res, http.StatusRequestTimeout, "timeout waiting for interactions to be met")
+			return c.JSON(http.StatusRequestTimeout, httpresponse.Error("timeout waiting for interactions to be met"))
 		}
 
-		return
+		return c.NoContent(http.StatusOK)
 	}
 
 	log.Info("waiting for all")
@@ -233,52 +223,48 @@ func (a *api) interactionsWaitHandler(res http.ResponseWriter, req *http.Request
 			}
 		}
 
-		httpresponse.Error(res, http.StatusRequestTimeout, "timeout waiting for interactions to be met")
+		return c.JSON(http.StatusRequestTimeout, httpresponse.Error("timeout waiting for interactions to be met"))
 	}
+	return c.NoContent(http.StatusOK)
 }
 
-func (a *api) indexHandler(res http.ResponseWriter, req *http.Request) {
+func (a *api) indexHandler(c echo.Context) error {
+	req := c.Request()
 	log.Infof("proxying %s %s", req.Method, req.URL.Path)
 
-	mediaType, err := parseMediaTypeHeader(req.Header)
+	mediaType, err := parseMediaTypeHeader(c.Request().Header)
 	if err != nil {
-		httpresponse.Errorf(res, http.StatusBadRequest, "failed to parse Content-Type header. %s", err.Error())
-		return
+		return c.JSON(http.StatusBadRequest, httpresponse.Errorf("failed to parse Content-Type header. %s", err.Error()))
 	}
 
 	parseRequest, ok := supportedMediaTypes[mediaType]
 	if !ok {
-		httpresponse.Errorf(res, http.StatusUnsupportedMediaType, "unsupported Media Type: %s", mediaType)
-		return
+		return c.JSON(http.StatusUnsupportedMediaType, httpresponse.Errorf("unsupported Media Type: %s", mediaType))
 	}
 
 	allInteractions, ok := a.interactions.FindAll(req.URL.Path, req.Method)
 	if !ok {
-		httpresponse.Errorf(res, http.StatusBadRequest, "unable to find interaction to Match '%s %s'", req.Method, req.URL.Path)
-		return
+		return c.JSON(http.StatusBadRequest, httpresponse.Errorf("unable to find interaction to Match '%s %s'", req.Method, req.URL.Path))
 	}
 
 	data, err := ioutil.ReadAll(req.Body)
 	if err != nil {
-		httpresponse.Errorf(res, http.StatusBadRequest, "unable to read requestDocument data. %s", err.Error())
-		return
+		return c.JSON(http.StatusBadRequest, httpresponse.Errorf("unable to read requestDocument data. %s", err.Error()))
 	}
 
-	err = req.Body.Close()
+	err = c.Request().Body.Close()
 	if err != nil {
-		httpresponse.Error(res, http.StatusInternalServerError, err.Error())
-		return
+		return c.JSON(http.StatusInternalServerError, httpresponse.Error(err.Error()))
 	}
 
-	req.Body = ioutil.NopCloser(bytes.NewBuffer(data))
+	c.Request().Body = ioutil.NopCloser(bytes.NewBuffer(data))
 
-	request, err := parseRequest(data, req.URL)
+	request, err := parseRequest(data, c.Request().URL)
 	if err != nil {
-		httpresponse.Errorf(res, http.StatusInternalServerError, "unable to read requestDocument data. %s", err.Error())
-		return
+		return c.JSON(http.StatusInternalServerError, httpresponse.Errorf("unable to read requestDocument data. %s", err.Error()))
 	}
 	h := make(map[string]interface{})
-	for headerName, headerValues := range req.Header {
+	for headerName, headerValues := range c.Request().Header {
 		for _, headerValue := range headerValues {
 			h[headerName] = headerValue
 		}
@@ -302,12 +288,12 @@ func (a *api) indexHandler(res http.ResponseWriter, req *http.Request) {
 			results := strings.Join(info, "\n")
 			log.Infof("constraints do not match for '%s'.\n\n%s", desc, results)
 		}
-		httpresponse.Error(res, http.StatusBadRequest, "constraints do not match")
-		return
+		return c.JSON(http.StatusBadRequest, httpresponse.Error("constraints do not match"))
 	}
 
 	a.notify.Notify()
-	a.proxy.ServeHTTP(&ResponseModificationWriter{res: res, interactions: matched}, req)
+	a.proxy.ServeHTTP(&ResponseModificationWriter{res: c.Response(), interactions: matched}, req)
+	return nil
 }
 
 func parseMediaTypeHeader(header http.Header) (string, error) {

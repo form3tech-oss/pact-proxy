@@ -1,61 +1,58 @@
 package configuration
 
 import (
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 
 	"github.com/form3tech-oss/pact-proxy/internal/app/httpresponse"
 	"github.com/form3tech-oss/pact-proxy/internal/app/pactproxy"
+	"github.com/labstack/echo/v4"
 	log "github.com/sirupsen/logrus"
 )
 
-func ServeAdminAPI(port int) *http.Server {
-	adminServerHandler := http.NewServeMux()
-	s := &http.Server{
-		Addr:    fmt.Sprintf(":%d", port),
-		Handler: adminServerHandler,
-	}
+func ServeAdminAPI(port int) *echo.Echo {
+	adminServer := echo.New()
+	adminServer.HideBanner = true
 
-	adminServerHandler.HandleFunc("/proxies", adminHandler)
+	adminServer.DELETE("/proxies", deleteProxiesHandler)
+	adminServer.POST("/proxies", postProxiesHandler)
 
 	go func() {
-		if err := s.ListenAndServe(); err != nil {
+		address := fmt.Sprintf(":%d", port)
+		if err := adminServer.Start(address); err != nil {
 			log.Fatal(err)
 		}
 	}()
 
-	return s
+	return adminServer
 }
 
-func adminHandler(w http.ResponseWriter, req *http.Request) {
-	if req.Method == http.MethodDelete {
-		log.Infof("closing all proxies")
-		CloseAllServers()
-		return
+func deleteProxiesHandler(c echo.Context) error {
+	log.Infof("closing all proxies")
+	CloseAllServers()
+	return c.NoContent(http.StatusNoContent)
+}
+
+func postProxiesHandler(c echo.Context) error {
+
+	proxyConfig := pactproxy.Config{}
+	err := c.Bind(&proxyConfig)
+	if err != nil {
+		return c.JSON(
+			http.StatusBadRequest,
+			httpresponse.Errorf("unable to parse interactionConstraint from data. %s", err.Error()),
+		)
 	}
 
-	if req.Method == http.MethodPost {
-		configBytes, err := ioutil.ReadAll(req.Body)
-		if err != nil {
-			httpresponse.Errorf(w, http.StatusBadRequest, "unable to read constraint. %s", err.Error())
-			return
-		}
+	log.Infof("setting up proxy from %s to %s", proxyConfig.ServerAddress, proxyConfig.Target)
 
-		proxyConfig := pactproxy.Config{}
-		err = json.Unmarshal(configBytes, &proxyConfig)
-		if err != nil {
-			httpresponse.Errorf(w, http.StatusBadRequest, "unable to parse interactionConstraint from data. %s", err.Error())
-			return
-		}
-
-		log.Infof("setting up proxy from %s to %s", proxyConfig.ServerAddress, proxyConfig.Target)
-
-		err = ConfigureProxy(proxyConfig)
-		if err != nil {
-			httpresponse.Errorf(w, http.StatusInternalServerError, "unable to create proxy from configuration. %s", err.Error())
-			return
-		}
+	err = ConfigureProxy(proxyConfig)
+	if err != nil {
+		return c.JSON(
+			http.StatusInternalServerError,
+			httpresponse.Errorf("unable to create proxy from configuration. %s", err.Error()),
+		)
 	}
+
+	return c.NoContent(http.StatusNoContent)
 }
