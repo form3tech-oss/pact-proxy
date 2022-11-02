@@ -48,6 +48,7 @@ func (p *PactProxy) addConstraint(interaction, pactPath, value string) {
 	})
 
 	r, _ := http.NewRequest("POST", strings.TrimSuffix(p.url, "/")+"/interactions/constraints", bytes.NewBuffer(b))
+	r.Header.Set("Content-Type", "application/json")
 	_, err := p.client.Do(r)
 	if err != nil {
 		panic(err)
@@ -66,6 +67,7 @@ func (p *PactProxy) addModifier(interaction, path string, value interface{}, att
 	b, _ := json.Marshal(body)
 
 	r, _ := http.NewRequest("POST", strings.TrimSuffix(p.url, "/")+"/interactions/modifiers", bytes.NewBuffer(b))
+	r.Header.Set("Content-Type", "application/json")
 	_, err := p.client.Do(r)
 	if err != nil {
 		panic(err)
@@ -90,6 +92,7 @@ func (p *PactProxy) addConstraintFrom(interaction, pactPath, fromInteraction, fo
 		return
 	}
 
+	r.Header.Set("Content-Type", "application/json")
 	res, err := p.client.Do(r)
 	if err != nil {
 		log.Warn(err.Error())

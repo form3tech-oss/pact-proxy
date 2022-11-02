@@ -6,16 +6,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/require"
 )
 
 func TestInteractionsWaitHandler(t *testing.T) {
 	r := require.New(t)
-	api := api{
-		interactions: &Interactions{},
-		notify:       NewNotify(),
-		delay:        20 * time.Millisecond,
-		duration:     150 * time.Millisecond,
+	a := api{
+		notify:   NewNotify(),
+		delay:    20 * time.Millisecond,
+		duration: 150 * time.Millisecond,
 	}
 
 	for _, tt := range []struct {
@@ -63,8 +63,11 @@ func TestInteractionsWaitHandler(t *testing.T) {
 
 		t.Run(tt.name, func(t *testing.T) {
 			rec := httptest.NewRecorder()
-			api.interactions = tt.interactions
-			r.NotPanics(func() { api.interactionsWaitHandler(rec, tt.req) })
+			e := echo.New()
+			c := e.NewContext(tt.req, rec)
+			a.interactions = tt.interactions
+
+			r.NotPanics(func() { a.interactionsWaitHandler(c) })
 			r.Equal(tt.code, rec.Code)
 		})
 	}
