@@ -42,7 +42,7 @@ func (m *regexPathMatcher) match(val string) bool {
 }
 
 type interaction struct {
-	mu             sync.Mutex
+	mu             sync.RWMutex
 	pathMatcher    pathMatcher
 	Method         string                 `json:"method"`
 	Alias          string                 `json:"alias"`
