@@ -2,7 +2,6 @@ package pactproxy
 
 import (
 	"bytes"
-	"context"
 	"io/ioutil"
 	"mime"
 	"net/http"
@@ -13,32 +12,20 @@ import (
 	"time"
 
 	"github.com/form3tech-oss/pact-proxy/internal/app/httpresponse"
-	"github.com/sethvargo/go-envconfig"
 	log "github.com/sirupsen/logrus"
 )
 
-type Config struct {
-	ServerAddress url.URL       `env:"SERVER_ADDRESS"`            // Address to listen on
-	Proxies       []url.URL     `env:"PROXIES,delimiter=;"`       // List of URL to serve pact-proxy on, e.g. http://localhost:8080;http://localhost:8081
-	AdminPort     int           `env:"ADMIN_PORT,default=8080"`   // Port for Admin server
-	WaitDelay     time.Duration `env:"WAIT_DELAY,default=500ms"`  // Default Delay for WaitForInteractions endpoint
-	WaitDuration  time.Duration `env:"WAIT_DURATION,default=15s"` // Default Duration for WaitForInteractions endpoint
-	Target        url.URL       // Do not load Target from env, we set this for each value from Proxies
-}
+const (
+	defaultDelay    = 500 * time.Millisecond
+	defaultDuration = 15 * time.Second
+)
 
-func (c *Config) SetDefaults() {
-	defaultConfig := Config{}
-	// Can be changed (on next release) to: envconfig.ExtractDefaults(context.Background(), &defaultConfig)
-	envconfig.ProcessWith(context.Background(), &defaultConfig, envconfig.MapLookuper(nil))
-	if c.AdminPort == 0 {
-		c.AdminPort = defaultConfig.AdminPort
-	}
-	if c.WaitDelay == 0 {
-		c.WaitDelay = defaultConfig.WaitDelay
-	}
-	if c.WaitDuration == 0 {
-		c.WaitDuration = defaultConfig.WaitDuration
-	}
+type Config struct {
+	ServerAddress url.URL       `env:"SERVER_ADDRESS"`      // Address to listen on
+	Proxies       []url.URL     `env:"PROXIES,delimiter=;"` // List of URL to serve pact-proxy on, e.g. http://localhost:8080;http://localhost:8081
+	WaitDelay     time.Duration `env:"WAIT_DELAY"`          // Default Delay for WaitForInteractions endpoint
+	WaitDuration  time.Duration `env:"WAIT_DURATION"`       // Default Duration for WaitForInteractions endpoint
+	Target        url.URL       // Do not load Target from env, we set this for each value from Proxies
 }
 
 var supportedMediaTypes = map[string]func([]byte, *url.URL) (requestDocument, error){
@@ -54,6 +41,12 @@ func StartProxy(server *http.ServeMux, config *Config) {
 		notify:       NewNotify(),
 		delay:        config.WaitDelay,
 		duration:     config.WaitDuration,
+	}
+	if api.delay == 0 {
+		api.delay = defaultDelay
+	}
+	if api.duration == 0 {
+		api.duration = defaultDuration
 	}
 
 	for path, handler := range map[string]func(http.ResponseWriter, *http.Request){
@@ -199,10 +192,13 @@ func (a *api) interactionsWaitHandler(res http.ResponseWriter, req *http.Request
 			return
 		}
 
-		log.Infof("waiting for %s", waitFor)
-		log.Infof("CONFIG: delay: %s, duration: %s", a.delay, a.duration)
+		log.WithField("wait_for", waitFor).Infof("waiting")
 		retryFor(func(timeLeft time.Duration) bool {
-			log.Infof("retry: %s", timeLeft)
+			log.WithFields(log.Fields{
+				"wait_for":       waitFor,
+				"count":          waitForCount,
+				"time_remaining": timeLeft,
+			}).Infof("retry")
 			if interaction.HasRequests(waitForCount) {
 				return true
 			}

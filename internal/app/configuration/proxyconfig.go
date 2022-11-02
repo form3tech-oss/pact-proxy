@@ -11,12 +11,12 @@ import (
 func NewFromEnv() pactproxy.Config {
 	ctx := context.Background()
 
-	var c pactproxy.Config
-	err := envconfig.Process(ctx, &c)
+	var config pactproxy.Config
+	err := envconfig.Process(ctx, &config)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
-	return c
+	return config
 }
 
 func ConfigureProxy(config pactproxy.Config) error {

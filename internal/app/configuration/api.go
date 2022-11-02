@@ -49,7 +49,6 @@ func adminHandler(w http.ResponseWriter, req *http.Request) {
 			httpresponse.Errorf(w, http.StatusBadRequest, "unable to parse interactionConstraint from data. %s", err.Error())
 			return
 		}
-		proxyConfig.SetDefaults()
 
 		log.Infof("setting up proxy from %s to %s", proxyConfig.ServerAddress, proxyConfig.Target)
 
