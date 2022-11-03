@@ -9,7 +9,7 @@ export GOFLAGS=-mod=vendor
 
 DOCKER_IMG ?= form3tech/pact-proxy
 
-ifeq (${platform},Darwin)
+ifeq (${PLATFORM},Darwin)
 PACT_FILE := "pact-${PACT_VERSION}-osx.tar.gz"
 else
 PACT_FILE := "pact-${PACT_VERSION}-linux-x86_64.tar.gz"
@@ -41,7 +41,7 @@ vendor:
 install-pact:
 	@if [ ! -d ./pact ]; then \
         echo "pact not installed, installing..."; \
-        wget --quiet https://github.com/pact-foundation/pact-ruby-standalone/releases/download/v${PACT_VERSION}/${PACT_FILE} -O /tmp/pactserver.tar.gz && tar -xzf /tmp/pactserver.tar.gz 2>/dev/null -C .; \
+        curl -sSLf https://github.com/pact-foundation/pact-ruby-standalone/releases/download/v${PACT_VERSION}/${PACT_FILE} -o /tmp/pactserver.tar.gz && tar -xzf /tmp/pactserver.tar.gz 2>/dev/null -C .; \
     fi
 
 .PHONY: publish
