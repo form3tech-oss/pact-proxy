@@ -5,10 +5,11 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
-	"github.com/form3tech-oss/pact-proxy/internal/app/configuration"
+	"github.com/form3tech-oss/pact-proxy/internal/app/pactproxy"
 	"github.com/pkg/errors"
 )
 
@@ -27,12 +28,24 @@ func Configuration(url string) *ProxyConfiguration {
 }
 
 func (conf *ProxyConfiguration) SetupProxy(serverAddress, targetAddress string) (*PactProxy, error) {
-	config := &configuration.ProxyConfig{
-		ServerAddress: serverAddress,
-		Target:        targetAddress,
+	serverURL, err := url.Parse(serverAddress)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse server address")
+	}
+	targetURL, err := url.Parse(targetAddress)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse target address")
 	}
 
-	content, _ := json.Marshal(config)
+	config := &pactproxy.Config{
+		ServerAddress: *serverURL,
+		Target:        *targetURL,
+	}
+
+	content, err := json.Marshal(config)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to marshal config")
+	}
 
 	req, err := http.NewRequest("POST", strings.TrimSuffix(conf.url, "/")+"/proxies", bytes.NewReader(content))
 	if err != nil {
