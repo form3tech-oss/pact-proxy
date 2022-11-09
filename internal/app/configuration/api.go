@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/form3tech-oss/pact-proxy/internal/app/httpresponse"
+	"github.com/form3tech-oss/pact-proxy/internal/app/pactproxy"
 	"github.com/labstack/echo/v4"
 	log "github.com/sirupsen/logrus"
 )
@@ -34,7 +35,7 @@ func deleteProxiesHandler(c echo.Context) error {
 
 func postProxiesHandler(c echo.Context) error {
 
-	proxyConfig := ProxyConfig{}
+	proxyConfig := pactproxy.Config{}
 	err := c.Bind(&proxyConfig)
 	if err != nil {
 		return c.JSON(
