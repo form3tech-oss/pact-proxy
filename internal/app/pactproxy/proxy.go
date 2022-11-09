@@ -21,6 +21,14 @@ const (
 	defaultDuration = 15 * time.Second
 )
 
+type Config struct {
+	ServerAddress url.URL       `env:"SERVER_ADDRESS"`      // Address to listen on
+	Proxies       []url.URL     `env:"PROXIES,delimiter=;"` // List of URL to serve pact-proxy on, e.g. http://localhost:8080;http://localhost:8081
+	WaitDelay     time.Duration `env:"WAIT_DELAY"`          // Default Delay for WaitForInteractions endpoint
+	WaitDuration  time.Duration `env:"WAIT_DURATION"`       // Default Duration for WaitForInteractions endpoint
+	Target        url.URL       // Do not load Target from env, we set this for each value from Proxies
+}
+
 var supportedMediaTypes = map[string]func([]byte, *url.URL) (requestDocument, error){
 	mediaTypeJSON: ParseJSONRequest,
 	mediaTypeText: ParsePlainTextRequest,
@@ -41,16 +49,22 @@ func (a *api) ProxyRequest(c echo.Context) error {
 	return nil
 }
 
-func StartProxy(e *echo.Echo, target *url.URL) {
+func StartProxy(e *echo.Echo, config *Config) {
 
 	// Create these once at startup, thay are shared by all server threads
 	a := api{
-		target:       target,
-		proxy:        httputil.NewSingleHostReverseProxy(target),
+		target:       &config.Target,
+		proxy:        httputil.NewSingleHostReverseProxy(&config.Target),
 		interactions: &Interactions{},
 		notify:       NewNotify(),
-		delay:        defaultDelay,
-		duration:     defaultDuration,
+		delay:        config.WaitDelay,
+		duration:     config.WaitDuration,
+	}
+	if a.delay == 0 {
+		a.delay = defaultDelay
+	}
+	if a.duration == 0 {
+		a.duration = defaultDuration
 	}
 
 	e.GET("/ready", a.readinessHandler)
@@ -168,8 +182,13 @@ func (a *api) interactionsWaitHandler(c echo.Context) error {
 			return c.JSON(http.StatusBadRequest, httpresponse.Errorf("cannot wait for interaction '%s', interaction not found.", waitFor))
 		}
 
-		log.Infof("waiting for %s", waitFor)
+		log.WithField("wait_for", waitFor).Infof("waiting")
 		retryFor(func(timeLeft time.Duration) bool {
+			log.WithFields(log.Fields{
+				"wait_for":       waitFor,
+				"count":          waitForCount,
+				"time_remaining": timeLeft,
+			}).Infof("retry")
 			if interaction.HasRequests(waitForCount) {
 				return true
 			}

@@ -4,21 +4,22 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
-	"strings"
 	"syscall"
 
 	"github.com/form3tech-oss/pact-proxy/internal/app/configuration"
+	"github.com/form3tech-oss/pact-proxy/internal/app/pactproxy"
 	log "github.com/sirupsen/logrus"
 )
 
 func main() {
-	proxies := os.Getenv("PROXIES")
-	for _, proxy := range strings.Split(strings.TrimSpace(proxies), ";") {
-		if proxy != "" {
-			log.Infof("setting up proxy for %s", proxy)
-			if err := configuration.ConfigureProxy(configuration.ProxyConfig{Target: proxy}); err != nil {
-				panic(err)
-			}
+	config, err := configuration.NewFromEnv()
+	if err != nil {
+		log.WithError(err).Fatal("unable to load configuration")
+	}
+	for _, proxy := range config.Proxies {
+		log.Infof("setting up proxy for %s", proxy)
+		if err := configuration.ConfigureProxy(pactproxy.Config{Target: proxy}); err != nil {
+			panic(err)
 		}
 	}
 

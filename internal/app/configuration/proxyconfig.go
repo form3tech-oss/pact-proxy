@@ -1,38 +1,30 @@
 package configuration
 
 import (
-	"fmt"
-	"net/url"
+	"context"
 
 	"github.com/form3tech-oss/pact-proxy/internal/app/pactproxy"
+	"github.com/pkg/errors"
+	"github.com/sethvargo/go-envconfig"
 )
 
-type ProxyConfig struct {
-	ServerAddress string
-	Target        string
+func NewFromEnv() (pactproxy.Config, error) {
+	ctx := context.Background()
+
+	var config pactproxy.Config
+	err := envconfig.Process(ctx, &config)
+	if err != nil {
+		return config, errors.Wrap(err, "process env config")
+	}
+	return config, nil
 }
 
-func ConfigureProxy(config ProxyConfig) error {
-	targetURL, err := url.Parse(config.Target)
+func ConfigureProxy(config pactproxy.Config) error {
+	server, err := GetServer(&config.ServerAddress)
 	if err != nil {
 		return err
 	}
 
-	serverAddr := config.ServerAddress
-	if serverAddr == "" {
-		serverAddr = fmt.Sprintf("http://:%s", targetURL.Port())
-	}
-
-	serverAddrURL, err := url.Parse(serverAddr)
-	if err != nil {
-		return err
-	}
-
-	server, err := GetServer(serverAddrURL)
-	if err != nil {
-		return err
-	}
-
-	pactproxy.StartProxy(server, targetURL)
+	pactproxy.StartProxy(server, &config)
 	return err
 }
