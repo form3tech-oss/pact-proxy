@@ -46,10 +46,7 @@ func TestInteractionsWaitHandler(t *testing.T) {
 			name: "timing out existing interaction",
 			interactions: func() *Interactions {
 				interactions := Interactions{}
-				interactions.Store(&interaction{
-					Alias:       "existing",
-					Description: "Existing",
-				})
+				interactions.Store(newInteraction("existing"))
 				return &interactions
 			}(),
 			req: func() *http.Request {
@@ -71,4 +68,17 @@ func TestInteractionsWaitHandler(t *testing.T) {
 			r.Equal(tt.code, rec.Code)
 		})
 	}
+}
+
+func newInteraction(alias string) *interaction {
+	i := &interaction{
+		Alias:       alias,
+		Description: alias,
+		constraints: map[string]interactionConstraint{},
+	}
+	i.Modifiers = &interactionModifiers{
+		interaction: i,
+		modifiers:   map[string]*interactionModifier{},
+	}
+	return i
 }

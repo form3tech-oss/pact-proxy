@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"sync"
-	"sync/atomic"
 
 	"github.com/tidwall/sjson"
 )
@@ -19,7 +17,7 @@ type interactionModifier struct {
 
 type interactionModifiers struct {
 	interaction *interaction
-	modifiers   sync.Map
+	modifiers   map[string]*interactionModifier
 }
 
 func (im *interactionModifier) Key() string {
@@ -27,22 +25,26 @@ func (im *interactionModifier) Key() string {
 }
 
 func (ims *interactionModifiers) AddModifier(modifier *interactionModifier) {
-	ims.modifiers.Store(modifier.Key(), modifier)
+	ims.interaction.mu.Lock()
+	defer ims.interaction.mu.Unlock()
+	ims.modifiers[modifier.Key()] = modifier
 }
 
 func (ims *interactionModifiers) Modifiers() []*interactionModifier {
 	var result []*interactionModifier
-	ims.modifiers.Range(func(_, v interface{}) bool {
-		result = append(result, v.(*interactionModifier))
-		return true
-	})
+	ims.interaction.mu.RLock()
+	defer ims.interaction.mu.RUnlock()
+	for _, modifier := range ims.modifiers {
+		result = append(result, modifier)
+	}
 	return result
 }
 
 func (ims *interactionModifiers) modifyBody(b []byte) ([]byte, error) {
 	for _, m := range ims.Modifiers() {
+		requestCount := ims.interaction.getRequestCount()
 		if strings.HasPrefix(m.Path, "$.body.") {
-			if m.Attempt == nil || *m.Attempt == int(atomic.LoadInt32(&ims.interaction.requestCount)) {
+			if m.Attempt == nil || *m.Attempt == requestCount {
 				var err error
 				b, err = sjson.SetBytes(b, m.Path[7:], m.Value)
 				if err != nil {
@@ -56,8 +58,9 @@ func (ims *interactionModifiers) modifyBody(b []byte) ([]byte, error) {
 
 func (ims *interactionModifiers) modifyStatusCode() (bool, int) {
 	for _, m := range ims.Modifiers() {
+		requestCount := ims.interaction.getRequestCount()
 		if m.Path == "$.status" {
-			if m.Attempt == nil || *m.Attempt == int(atomic.LoadInt32(&ims.interaction.requestCount)) {
+			if m.Attempt == nil || *m.Attempt == requestCount {
 				code, err := strconv.Atoi(fmt.Sprintf("%v", m.Value))
 				if err == nil {
 					return true, code
