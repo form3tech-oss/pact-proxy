@@ -1,6 +1,7 @@
 package pactproxy
 
 import (
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -74,11 +75,87 @@ func newInteraction(alias string) *interaction {
 	i := &interaction{
 		Alias:       alias,
 		Description: alias,
-		constraints: map[string]interactionConstraint{},
+		Constraints: map[string]interactionConstraint{},
 	}
 	i.Modifiers = &interactionModifiers{
 		interaction: i,
 		modifiers:   map[string]*interactionModifier{},
 	}
 	return i
+}
+
+func TestInteractionsGetHandler(t *testing.T) {
+	r := require.New(t)
+	api := api{
+		interactions: &Interactions{},
+		notify:       NewNotify(),
+		delay:        20 * time.Millisecond,
+		duration:     150 * time.Millisecond,
+	}
+
+	for _, tt := range []struct {
+		name         string
+		interactions *Interactions
+		code         int
+		body         string
+	}{
+		{
+			name: "interaction found - without request history",
+			interactions: func() *Interactions {
+				interactions := Interactions{}
+				request := map[string]interface{}{
+					"body": map[string]interface{}{"foo": "bar"},
+					"path": "/testpath",
+				}
+				i := newInteraction("test")
+				i.StoreRequest(request)
+				interactions.Store(i)
+				return &interactions
+			}(),
+			code: http.StatusOK,
+			body: `{"method":"","alias":"test","description":"test","definition":null,"constraints":{},"modifiers":{},"request_count":1}`,
+		},
+		{
+			name: "interaction found - with request history",
+			interactions: func() *Interactions {
+				interactions := Interactions{}
+				request := map[string]interface{}{
+					"body": map[string]interface{}{"foo": "bar"},
+					"path": "/testpath",
+				}
+				i := newInteraction("test")
+				i.recordHistory = true
+				i.StoreRequest(request)
+				interactions.Store(i)
+				return &interactions
+			}(),
+			code: http.StatusOK,
+			body: `{"method":"","alias":"test","description":"test","definition":null,"constraints":{},"modifiers":{},"request_count":1,"request_history":[{"body":{"foo":"bar"},"path":"/testpath"}]}`,
+		},
+		{
+			name:         "interaction not found",
+			interactions: &Interactions{},
+			code:         http.StatusBadRequest,
+			body:         `{"error_message":"interaction \"test\" not found"}`,
+		},
+	} {
+		tt := tt
+
+		t.Run(tt.name, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			req, _ := http.NewRequest(http.MethodGet, "/interactions/test", nil)
+			e := echo.New()
+			c := e.NewContext(req, rec)
+			c.SetParamNames("alias")
+			c.SetParamValues("test")
+			api.interactions = tt.interactions
+			r.NotPanics(func() { api.interactionsGetHandler(c) })
+			r.Equal(tt.code, rec.Code)
+			body := rec.Result().Body
+			defer body.Close()
+			data, err := io.ReadAll(body)
+			r.NoError(err)
+			r.Equal(tt.body+"\n", string(data))
+		})
+	}
 }

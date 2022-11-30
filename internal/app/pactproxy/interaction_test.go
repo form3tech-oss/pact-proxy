@@ -110,7 +110,7 @@ func TestLoadInteractionPlainTextConstraints(t *testing.T) {
 			require.Equalf(t, tt.wantErr, err != nil, "error %v", err)
 
 			var foundConstraint interactionConstraint
-			for _, constraint := range interaction.constraints {
+			for _, constraint := range interaction.Constraints {
 				foundConstraint = constraint
 				break
 			}
@@ -244,7 +244,7 @@ func TestV3MatchingRulesLeadToCorrectConstraints(t *testing.T) {
 			require.Equalf(t, tt.wantErr, err != nil, "error %v", err)
 
 			var foundConstraint interactionConstraint
-			for _, constraint := range interaction.constraints {
+			for _, constraint := range interaction.Constraints {
 				foundConstraint = constraint
 				break
 			}

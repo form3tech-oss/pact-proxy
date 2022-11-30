@@ -35,12 +35,13 @@ var supportedMediaTypes = map[string]func([]byte, *url.URL) (requestDocument, er
 }
 
 type api struct {
-	target       *url.URL
-	proxy        *httputil.ReverseProxy
-	interactions *Interactions
-	notify       *notify
-	delay        time.Duration
-	duration     time.Duration
+	target        *url.URL
+	proxy         *httputil.ReverseProxy
+	interactions  *Interactions
+	notify        *notify
+	delay         time.Duration
+	duration      time.Duration
+	recordHistory bool
 	echo.Context
 }
 
@@ -80,6 +81,7 @@ func StartProxy(e *echo.Echo, config *Config) {
 	e.POST("/interactions", a.interactionsPostHandler)
 	e.DELETE("/interactions", a.interactionsDeleteHandler)
 
+	e.GET("/interactions/:alias", a.interactionsGetHandler)
 	e.GET("/interactions/wait", a.interactionsWaitHandler)
 
 	e.Any("/*", a.indexHandler)
@@ -158,6 +160,7 @@ func (a *api) interactionsPostHandler(c echo.Context) error {
 		log.Infof("storing interaction '%s'", interaction.Description)
 	}
 
+	interaction.recordHistory = a.recordHistory
 	a.interactions.Store(interaction)
 
 	err = c.Request().Body.Close()
@@ -168,6 +171,16 @@ func (a *api) interactionsPostHandler(c echo.Context) error {
 	c.Request().Body = io.NopCloser(bytes.NewBuffer(data))
 
 	return a.ProxyRequest(c)
+}
+
+func (a *api) interactionsGetHandler(c echo.Context) error {
+	alias := c.Param("alias")
+	interaction, found := a.interactions.Load(alias)
+	if !found {
+		return c.JSON(http.StatusBadRequest, httpresponse.Errorf("interaction %q not found", alias))
+	}
+
+	return c.JSON(http.StatusOK, interaction)
 }
 
 func (a *api) interactionsWaitHandler(c echo.Context) error {
