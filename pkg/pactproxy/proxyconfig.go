@@ -3,7 +3,7 @@ package pactproxy
 import (
 	"bytes"
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -59,7 +59,7 @@ func (conf *ProxyConfiguration) SetupProxy(serverAddress, targetAddress string) 
 		return nil, err
 	}
 
-	responseBody, err := ioutil.ReadAll(res.Body)
+	responseBody, err := io.ReadAll(res.Body)
 	defer res.Body.Close()
 
 	if res.StatusCode < 200 || res.StatusCode >= 300 {

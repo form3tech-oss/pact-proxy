@@ -3,7 +3,7 @@ Simple library for retry mechanism
 
 slightly inspired by [Try::Tiny::Retry](https://metacpan.org/pod/Try::Tiny::Retry)
 
-SYNOPSIS
+# SYNOPSIS
 
 http get with retry:
 
@@ -30,8 +30,7 @@ http get with retry:
 
 [next examples](https://github.com/avast/retry-go/tree/master/examples)
 
-
-SEE ALSO
+# SEE ALSO
 
 * [giantswarm/retry-go](https://github.com/giantswarm/retry-go) - slightly complicated interface.
 
@@ -43,27 +42,28 @@ SEE ALSO
 
 * [matryer/try](https://github.com/matryer/try) - very popular package, nonintuitive interface (for me)
 
-
-BREAKING CHANGES
+# BREAKING CHANGES
 
 * 4.0.0
-	* infinity retry is possible by set `Attempts(0)` by PR [#49](https://github.com/avast/retry-go/pull/49)
+  - infinity retry is possible by set `Attempts(0)` by PR [#49](https://github.com/avast/retry-go/pull/49)
+
 * 3.0.0
-	* `DelayTypeFunc` accepts a new parameter `err` - this breaking change affects only your custom Delay Functions. This change allow [make delay functions based on error](examples/delay_based_on_error_test.go).
+  - `DelayTypeFunc` accepts a new parameter `err` - this breaking change affects only your custom Delay Functions. This change allow [make delay functions based on error](examples/delay_based_on_error_test.go).
+
 * 1.0.2 -> 2.0.0
-	* argument of `retry.Delay` is final delay (no multiplication by `retry.Units` anymore)
-	* function `retry.Units` are removed
-	* [more about this breaking change](https://github.com/avast/retry-go/issues/7)
+  - argument of `retry.Delay` is final delay (no multiplication by `retry.Units` anymore)
+  - function `retry.Units` are removed
+  - [more about this breaking change](https://github.com/avast/retry-go/issues/7)
+
 * 0.3.0 -> 1.0.0
-	* `retry.Retry` function are changed to `retry.Do` function
-	* `retry.RetryCustom` (OnRetry) and `retry.RetryCustomWithOpts` functions are now implement via functions produces Options (aka `retry.OnRetry`)
-
-
+  - `retry.Retry` function are changed to `retry.Do` function
+  - `retry.RetryCustom` (OnRetry) and `retry.RetryCustomWithOpts` functions are now implement via functions produces Options (aka `retry.OnRetry`)
 */
 package retry
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -101,7 +101,7 @@ func Do(retryableFunc RetryableFunc, opts ...Option) error {
 
 			config.onRetry(n, err)
 			select {
-			case <-time.After(delay(config, n, err)):
+			case <-config.timer.After(delay(config, n, err)):
 			case <-config.context.Done():
 				return nil
 			}
@@ -117,8 +117,14 @@ func Do(retryableFunc RetryableFunc, opts ...Option) error {
 		errorLog = make(Error, 1)
 	}
 
+	attemptsForError := make(map[error]uint, len(config.attemptsForError))
+	for err, attempts := range config.attemptsForError {
+		attemptsForError[err] = attempts
+	}
+
 	lastErrIndex := n
-	for n < config.attempts {
+	shouldRetry := true
+	for shouldRetry {
 		err := retryableFunc()
 
 		if err != nil {
@@ -129,6 +135,14 @@ func Do(retryableFunc RetryableFunc, opts ...Option) error {
 			}
 
 			config.onRetry(n, err)
+
+			for errToCheck, attempts := range attemptsForError {
+				if errors.Is(err, errToCheck) {
+					attempts--
+					attemptsForError[errToCheck] = attempts
+					shouldRetry = shouldRetry && attempts > 0
+				}
+			}
 
 			// if this is last attempt - don't wait
 			if n == config.attempts-1 {
@@ -141,6 +155,7 @@ func Do(retryableFunc RetryableFunc, opts ...Option) error {
 				if config.lastErrorOnly {
 					return config.context.Err()
 				}
+				n++
 				errorLog[n] = config.context.Err()
 				return errorLog
 			}
@@ -150,6 +165,8 @@ func Do(retryableFunc RetryableFunc, opts ...Option) error {
 		}
 
 		n++
+		shouldRetry = shouldRetry && n < config.attempts
+
 		if !config.lastErrorOnly {
 			lastErrIndex = n
 		}
@@ -163,15 +180,16 @@ func Do(retryableFunc RetryableFunc, opts ...Option) error {
 
 func newDefaultRetryConfig() *Config {
 	return &Config{
-		attempts:      uint(10),
-		delay:         100 * time.Millisecond,
-		maxJitter:     100 * time.Millisecond,
-		onRetry:       func(n uint, err error) {},
-		retryIf:       IsRecoverable,
-		delayType:     CombineDelay(BackOffDelay, RandomDelay),
-		lastErrorOnly: false,
-		context:       context.Background(),
-		timer:         &timerImpl{},
+		attempts:         uint(10),
+		attemptsForError: make(map[error]uint),
+		delay:            100 * time.Millisecond,
+		maxJitter:        100 * time.Millisecond,
+		onRetry:          func(n uint, err error) {},
+		retryIf:          IsRecoverable,
+		delayType:        CombineDelay(BackOffDelay, RandomDelay),
+		lastErrorOnly:    false,
+		context:          context.Background(),
+		timer:            &timerImpl{},
 	}
 }
 
@@ -189,6 +207,43 @@ func (e Error) Error() string {
 	}
 
 	return fmt.Sprintf("All attempts fail:\n%s", strings.Join(logWithNumber, "\n"))
+}
+
+func (e Error) Is(target error) bool {
+	for _, v := range e {
+		if errors.Is(v, target) {
+			return true
+		}
+	}
+	return false
+}
+
+func (e Error) As(target interface{}) bool {
+	for _, v := range e {
+		if errors.As(v, target) {
+			return true
+		}
+	}
+	return false
+}
+
+/*
+Unwrap the last error for compatible with the `errors.Unwrap()`
+when you need unwrap all erros, you should use `WrappedErrors()` instead
+
+	err := Do(
+		func() error {
+			return errors.New("original error")
+		},
+		Attempts(1),
+	)
+
+	fmt.Println(errors.Unwrap(err)) # "original error" is printed
+
+added in version 4.2.0
+*/
+func (e Error) Unwrap() error {
+	return e[len(e)-1]
 }
 
 func lenWithoutNil(e Error) (count int) {
