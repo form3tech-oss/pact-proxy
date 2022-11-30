@@ -2,7 +2,7 @@ package pactproxy
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"mime"
 	"net/http"
 	"net/http/httputil"
@@ -142,7 +142,7 @@ func (a *api) interactionsDeleteHandler(c echo.Context) error {
 }
 
 func (a *api) interactionsPostHandler(c echo.Context) error {
-	data, err := ioutil.ReadAll(c.Request().Body)
+	data, err := io.ReadAll(c.Request().Body)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, httpresponse.Errorf("unable to read interaction. %s", err.Error()))
 	}
@@ -165,7 +165,7 @@ func (a *api) interactionsPostHandler(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, httpresponse.Error(err.Error()))
 	}
 
-	c.Request().Body = ioutil.NopCloser(bytes.NewBuffer(data))
+	c.Request().Body = io.NopCloser(bytes.NewBuffer(data))
 
 	return a.ProxyRequest(c)
 }
@@ -247,7 +247,7 @@ func (a *api) indexHandler(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, httpresponse.Errorf("unable to find interaction to Match '%s %s'", req.Method, req.URL.Path))
 	}
 
-	data, err := ioutil.ReadAll(req.Body)
+	data, err := io.ReadAll(req.Body)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, httpresponse.Errorf("unable to read requestDocument data. %s", err.Error()))
 	}
@@ -257,7 +257,7 @@ func (a *api) indexHandler(c echo.Context) error {
 		return c.JSON(http.StatusInternalServerError, httpresponse.Error(err.Error()))
 	}
 
-	c.Request().Body = ioutil.NopCloser(bytes.NewBuffer(data))
+	c.Request().Body = io.NopCloser(bytes.NewBuffer(data))
 
 	request, err := parseRequest(data, c.Request().URL)
 	if err != nil {

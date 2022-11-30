@@ -23,16 +23,17 @@ type Timer interface {
 }
 
 type Config struct {
-	attempts      uint
-	delay         time.Duration
-	maxDelay      time.Duration
-	maxJitter     time.Duration
-	onRetry       OnRetryFunc
-	retryIf       RetryIfFunc
-	delayType     DelayTypeFunc
-	lastErrorOnly bool
-	context       context.Context
-	timer         Timer
+	attempts         uint
+	attemptsForError map[error]uint
+	delay            time.Duration
+	maxDelay         time.Duration
+	maxJitter        time.Duration
+	onRetry          OnRetryFunc
+	retryIf          RetryIfFunc
+	delayType        DelayTypeFunc
+	lastErrorOnly    bool
+	context          context.Context
+	timer            Timer
 
 	maxBackOffN uint
 }
@@ -55,6 +56,17 @@ func LastErrorOnly(lastErrorOnly bool) Option {
 func Attempts(attempts uint) Option {
 	return func(c *Config) {
 		c.attempts = attempts
+	}
+}
+
+// AttemptsForError sets count of retry in case execution results in given `err`
+// Retries for the given `err` are also counted against total retries.
+// The retry will stop if any of given retries is exhausted.
+//
+// added in 4.3.0
+func AttemptsForError(attempts uint, err error) Option {
+	return func(c *Config) {
+		c.attemptsForError[err] = attempts
 	}
 }
 
@@ -221,17 +233,18 @@ func Context(ctx context.Context) Option {
 // example of augmenting time.After with a print statement
 //
 // type struct MyTimer {}
-// func (t *MyTimer) After(d time.Duration) <- chan time.Time {
-//     fmt.Print("Timer called!")
-//     return time.After(d)
-// }
 //
+//	func (t *MyTimer) After(d time.Duration) <- chan time.Time {
+//	    fmt.Print("Timer called!")
+//	    return time.After(d)
+//	}
 //
 // retry.Do(
-//     func() error { ... },
-//	   retry.WithTimer(&MyTimer{})
-// )
 //
+//	    func() error { ... },
+//		   retry.WithTimer(&MyTimer{})
+//
+// )
 func WithTimer(t Timer) Option {
 	return func(c *Config) {
 		c.timer = t
