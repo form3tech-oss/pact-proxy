@@ -9,10 +9,9 @@ import (
 	"strings"
 	"sync"
 
-	log "github.com/sirupsen/logrus"
-
 	"github.com/PaesslerAG/jsonpath"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -40,22 +39,22 @@ func (m *regexPathMatcher) match(val string) bool {
 	return m.val.MatchString(val)
 }
 
-type interaction struct {
+type Interaction struct {
 	mu             sync.RWMutex
 	pathMatcher    pathMatcher
 	Method         string                           `json:"method"`
 	Alias          string                           `json:"alias"`
 	Description    string                           `json:"description"`
-	Definition     map[string]interface{}           `json:"definition"`
-	Constraints    map[string]interactionConstraint `json:"constraints"`
-	Modifiers      *interactionModifiers            `json:"modifiers"`
 	RequestCount   int                              `json:"request_count"`
 	RequestHistory []requestDocument                `json:"request_history,omitempty"`
-	lastRequest    requestDocument                  `json:"-"`
+	LastRequest    requestDocument                  `json:"last_request"`
+	definition     map[string]interface{}           `json:"-"`
+	constraints    map[string]interactionConstraint `json:"-"`
+	modifiers      interactionModifiers             `json:"-"`
 	recordHistory  bool                             `json:"-"`
 }
 
-func LoadInteraction(data []byte, alias string) (*interaction, error) {
+func LoadInteraction(data []byte, alias string) (*Interaction, error) {
 	definition := make(map[string]interface{})
 	err := json.Unmarshal(data, &definition)
 	if err != nil {
@@ -91,16 +90,16 @@ func LoadInteraction(data []byte, alias string) (*interaction, error) {
 	}
 	propertiesWithMatchingRule := getBodyPropertiesWithMatchingRules(matchingRules)
 
-	interaction := &interaction{
+	interaction := &Interaction{
 		pathMatcher: matcher,
 		Method:      request["method"].(string),
 		Alias:       alias,
-		Definition:  definition,
+		definition:  definition,
 		Description: description,
-		Constraints: map[string]interactionConstraint{},
+		constraints: map[string]interactionConstraint{},
 	}
 
-	interaction.Modifiers = &interactionModifiers{
+	interaction.modifiers = interactionModifiers{
 		interaction: interaction,
 		modifiers:   map[string]*interactionModifier{},
 	}
@@ -262,7 +261,7 @@ func parseMediaType(request map[string]interface{}) (string, error) {
 
 // This function adds constraints for all the fields in the JSON request body which do not
 // have a corresponding matching rule
-func (i *interaction) addJSONConstraintsFromPact(path string, matchingRules map[string]bool, values map[string]interface{}) {
+func (i *Interaction) addJSONConstraintsFromPact(path string, matchingRules map[string]bool, values map[string]interface{}) {
 	for k, v := range values {
 		switch val := v.(type) {
 		case map[string]interface{}:
@@ -285,7 +284,7 @@ func (i *interaction) addJSONConstraintsFromPact(path string, matchingRules map[
 
 // This function adds constraints for the entire plain text request body if
 // it doesn't have a corresponding matching rule
-func (i *interaction) addTextConstraintsFromPact(matchingRules map[string]bool, constraint string) {
+func (i *Interaction) addTextConstraintsFromPact(matchingRules map[string]bool, constraint string) {
 	if _, present := matchingRules["$.body"]; !present {
 		i.AddConstraint(interactionConstraint{
 			Path:   "$.body",
@@ -294,17 +293,17 @@ func (i *interaction) addTextConstraintsFromPact(matchingRules map[string]bool, 
 		})
 	}
 }
-func (i *interaction) Match(path, method string) bool {
+func (i *Interaction) Match(path, method string) bool {
 	return method == i.Method && i.pathMatcher.match(path)
 }
 
-func (i *interaction) AddConstraint(constraint interactionConstraint) {
+func (i *Interaction) AddConstraint(constraint interactionConstraint) {
 	i.mu.Lock()
 	defer i.mu.Unlock()
-	i.Constraints[constraint.Key()] = constraint
+	i.constraints[constraint.Key()] = constraint
 }
 
-func (i *interaction) loadValuesFromSource(constraint interactionConstraint, interactions *Interactions) ([]interface{}, error) {
+func (i *Interaction) loadValuesFromSource(constraint interactionConstraint, interactions *Interactions) ([]interface{}, error) {
 	values := append([]interface{}(nil), constraint.Values...)
 	sourceInteraction, ok := interactions.Load(constraint.Source)
 	if !ok {
@@ -312,26 +311,26 @@ func (i *interaction) loadValuesFromSource(constraint interactionConstraint, int
 	}
 
 	i.mu.RLock()
-	sourceRequest := sourceInteraction.lastRequest
+	sourceRequest := sourceInteraction.LastRequest
 	i.mu.RUnlock()
-	if len(sourceRequest) == 0 {
+	if sourceRequest == nil {
 		return nil, errors.Errorf("source interaction '%s' as no requests", constraint.Source)
 	}
 
 	for i, v := range constraint.Values {
-		values[i], _ = jsonpath.Get(v.(string), map[string]interface{}(sourceRequest))
+		values[i], _ = jsonpath.Get(v.(string), sourceRequest)
 	}
 
 	return values, nil
 }
 
-func (i *interaction) EvaluateConstrains(request requestDocument, interactions *Interactions) (bool, []string) {
+func (i *Interaction) EvaluateConstrains(request requestDocument, interactions *Interactions) (bool, []string) {
 	result := true
 	violations := make([]string, 0)
 
 	i.mu.RLock()
 	defer i.mu.RUnlock()
-	for _, constraint := range i.Constraints {
+	for _, constraint := range i.constraints {
 		values := constraint.Values
 		if constraint.Source != "" {
 			var err error
@@ -366,10 +365,10 @@ func (i *interaction) EvaluateConstrains(request requestDocument, interactions *
 	return result, violations
 }
 
-func (i *interaction) StoreRequest(request requestDocument) {
+func (i *Interaction) StoreRequest(request requestDocument) {
 	i.mu.Lock()
 	defer i.mu.Unlock()
-	i.lastRequest = request
+	i.LastRequest = request
 	i.RequestCount++
 
 	if i.recordHistory {
@@ -377,11 +376,11 @@ func (i *interaction) StoreRequest(request requestDocument) {
 	}
 }
 
-func (i *interaction) HasRequests(count int) bool {
+func (i *Interaction) HasRequests(count int) bool {
 	return i.getRequestCount() >= count
 }
 
-func (i *interaction) getRequestCount() int {
+func (i *Interaction) getRequestCount() int {
 	i.mu.RLock()
 	defer i.mu.RUnlock()
 	return i.RequestCount

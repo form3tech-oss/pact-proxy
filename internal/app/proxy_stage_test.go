@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync/atomic"
@@ -25,6 +26,7 @@ type ProxyStage struct {
 	assert                *assert.Assertions
 	pact                  *dsl.Pact
 	proxy                 *pactproxy.PactProxy
+	config                ProxyConfig
 	contentTypeConstraint string
 	nameConstraintValue   string
 	bodyConstraintValue   string
@@ -37,12 +39,22 @@ type ProxyStage struct {
 	modifiedStatusCode    int
 	modifiedAttempt       *int
 	modifiedBody          map[string]interface{}
+	interactionDetail     *pactproxy.Interaction
 }
 
 var largeString = strings.Repeat("long_string123BBmmF8BYezrBhCROOCRJfeH5k69hMKXH77TSvwF5GHUZFnbh1dsZ3d90HeR0jUIOovJJVS508uI17djeLFFSb7", 440)
 
+type ProxyConfig struct {
+	RecordHistory bool
+}
+
 func NewProxyStage(t *testing.T) (*ProxyStage, *ProxyStage, *ProxyStage) {
-	proxy, err := setupAndWaitForProxy()
+	return NewProxyStageWithConfig(t, ProxyConfig{})
+}
+
+func NewProxyStageWithConfig(t *testing.T, config ProxyConfig) (*ProxyStage, *ProxyStage, *ProxyStage) {
+
+	proxy, err := setupAndWaitForProxy(config)
 	if err != nil {
 		t.Logf("Error setting up proxy: %v", err)
 		t.Fail()
@@ -55,6 +67,7 @@ func NewProxyStage(t *testing.T) (*ProxyStage, *ProxyStage, *ProxyStage) {
 		pact:         pact,
 		modifiedBody: make(map[string]interface{}),
 		pactName:     "pact-" + strconv.FormatInt(time.Now().UnixMilli(), 10),
+		config:       config,
 	}
 
 	s.t.Cleanup(func() {
@@ -64,10 +77,16 @@ func NewProxyStage(t *testing.T) (*ProxyStage, *ProxyStage, *ProxyStage) {
 	return s, s, s
 }
 
-func setupAndWaitForProxy() (*pactproxy.PactProxy, error) {
+func setupAndWaitForProxy(config ProxyConfig) (*pactproxy.PactProxy, error) {
+	target := url.URL{Scheme: "http", Host: fmt.Sprintf("%s:%d", pact.Host, originalPactServerPort)}
+
 	proxy, err := pactproxy.
 		Configuration(adminURL.String()).
-		SetupProxy(proxyURL.String(), fmt.Sprintf("http://%s:%d", pact.Host, originalPactServerPort))
+		SetupProxyWithConfig(&pactproxy.Config{
+			ServerAddress: *proxyURL,
+			Target:        target,
+			RecordHistory: config.RecordHistory,
+		})
 	if err != nil {
 		return nil, errors.Wrap(err, "proxy setup failed")
 	}
@@ -463,4 +482,58 @@ func (s *ProxyStage) pact_can_be_generated() {
 	s.assert.NoError(err)
 	defer resp.Body.Close()
 	s.assert.Equal(http.StatusOK, resp.StatusCode, "Expected 200 but returned %d status code", resp.StatusCode)
+}
+
+func (s *ProxyStage) the_record_history_config_option_is_enabled() *ProxyStage {
+	s.assert.True(s.config.RecordHistory)
+	return s
+}
+
+func (s *ProxyStage) multiple_requests_are_sent_using_the_names(names ...string) {
+	s.pactResult = s.pact.Verify(func() (err error) {
+		s.requestsToSend = int32(len(names))
+		atomic.StoreInt32(&s.requestsSent, 0)
+
+		go func() {
+			for i := int32(0); i < s.requestsToSend; i++ {
+				u := fmt.Sprintf("http://localhost:%s/users", proxyURL.Port())
+				req, err := http.NewRequest("POST", u, strings.NewReader(fmt.Sprintf(`{"name":"%s"}`, names[i])))
+				s.assert.NoError(err)
+
+				req.Header.Set("Content-Type", "application/json")
+				atomic.AddInt32(&s.requestsSent, 1)
+				_, err = http.DefaultClient.Do(req)
+				s.assert.NoError(err)
+			}
+		}()
+
+		err = s.proxy.WaitForInteraction(s.pactName, int(s.requestsToSend))
+		s.assert.NoError(err)
+
+		interaction, err := s.proxy.ReadInteractionDetails(s.pactName)
+		s.assert.NoError(err)
+
+		s.interactionDetail = interaction
+		return nil
+	})
+}
+
+func (s *ProxyStage) the_proxy_returns_details_of_all_requests() {
+	s.assert.Equal(3, s.interactionDetail.RequestCount)
+	s.assert.Len(s.interactionDetail.RequestHistory, 3)
+
+	for i, name := range []string{"rod", "jane", "freddy"} {
+		req := s.interactionDetail.RequestHistory[i]
+
+		s.assert.Equal("/users", req.Path)
+		s.assert.Contains(req.Headers, "Content-Type")
+		s.assert.Equal("application/json", req.Headers["Content-Type"])
+
+		body := &struct {
+			Name string `json:"name"`
+		}{}
+		err := json.Unmarshal(req.Body, body)
+		s.assert.NoError(err)
+		s.assert.Equal(name, body.Name)
+	}
 }

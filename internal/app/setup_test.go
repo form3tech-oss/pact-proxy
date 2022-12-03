@@ -3,7 +3,6 @@ package app
 import (
 	"bytes"
 	"fmt"
-	"github.com/pact-foundation/pact-go/dsl"
 	"net/url"
 	"os"
 	"os/exec"
@@ -11,6 +10,8 @@ import (
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/pact-foundation/pact-go/dsl"
 
 	"github.com/form3tech-oss/pact-proxy/internal/app/configuration"
 	"github.com/pact-foundation/pact-go/utils"

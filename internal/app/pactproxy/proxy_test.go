@@ -71,13 +71,13 @@ func TestInteractionsWaitHandler(t *testing.T) {
 	}
 }
 
-func newInteraction(alias string) *interaction {
-	i := &interaction{
+func newInteraction(alias string) *Interaction {
+	i := &Interaction{
 		Alias:       alias,
 		Description: alias,
-		Constraints: map[string]interactionConstraint{},
+		constraints: map[string]interactionConstraint{},
 	}
-	i.Modifiers = &interactionModifiers{
+	i.modifiers = interactionModifiers{
 		interaction: i,
 		modifiers:   map[string]*interactionModifier{},
 	}
@@ -113,7 +113,7 @@ func TestInteractionsGetHandler(t *testing.T) {
 				return &interactions
 			}(),
 			code: http.StatusOK,
-			body: `{"method":"","alias":"test","description":"test","definition":null,"constraints":{},"modifiers":{},"request_count":1}`,
+			body: `{"method":"","alias":"test","description":"test","request_count":1,"last_request":{"body":{"foo":"bar"},"path":"/testpath"}}`,
 		},
 		{
 			name: "interaction found - with request history",
@@ -130,7 +130,7 @@ func TestInteractionsGetHandler(t *testing.T) {
 				return &interactions
 			}(),
 			code: http.StatusOK,
-			body: `{"method":"","alias":"test","description":"test","definition":null,"constraints":{},"modifiers":{},"request_count":1,"request_history":[{"body":{"foo":"bar"},"path":"/testpath"}]}`,
+			body: `{"method":"","alias":"test","description":"test","request_count":1,"request_history":[{"body":{"foo":"bar"},"path":"/testpath"}],"last_request":{"body":{"foo":"bar"},"path":"/testpath"}}`,
 		},
 		{
 			name:         "interaction not found",

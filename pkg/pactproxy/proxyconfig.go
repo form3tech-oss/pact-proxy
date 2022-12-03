@@ -18,6 +18,8 @@ type ProxyConfiguration struct {
 	url    string
 }
 
+type Config pactproxy.Config
+
 func Configuration(url string) *ProxyConfiguration {
 	return &ProxyConfiguration{
 		client: http.Client{
@@ -37,11 +39,14 @@ func (conf *ProxyConfiguration) SetupProxy(serverAddress, targetAddress string) 
 		return nil, errors.Wrap(err, "failed to parse target address")
 	}
 
-	config := &pactproxy.Config{
+	config := &Config{
 		ServerAddress: *serverURL,
 		Target:        *targetURL,
 	}
+	return conf.SetupProxyWithConfig(config)
+}
 
+func (conf *ProxyConfiguration) SetupProxyWithConfig(config *Config) (*PactProxy, error) {
 	content, err := json.Marshal(config)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to marshal config")
@@ -65,6 +70,7 @@ func (conf *ProxyConfiguration) SetupProxy(serverAddress, targetAddress string) 
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
 		return nil, errors.New(string(responseBody))
 	}
+	serverAddress := config.ServerAddress.String()
 	return New(serverAddress), err
 }
 

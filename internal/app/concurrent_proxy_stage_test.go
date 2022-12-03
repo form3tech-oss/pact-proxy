@@ -35,7 +35,7 @@ type ConcurrentProxyStage struct {
 }
 
 func NewConcurrentProxyStage(t *testing.T) (*ConcurrentProxyStage, *ConcurrentProxyStage, *ConcurrentProxyStage) {
-	proxy, err := setupAndWaitForProxy()
+	proxy, err := setupAndWaitForProxy(ProxyConfig{})
 	if err != nil {
 		t.Logf("Error setting up proxy: %v", err)
 		t.Fail()

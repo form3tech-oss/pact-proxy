@@ -40,7 +40,7 @@ func postProxiesHandler(c echo.Context) error {
 	if err != nil {
 		return c.JSON(
 			http.StatusBadRequest,
-			httpresponse.Errorf("unable to parse interactionConstraint from data. %s", err.Error()),
+			httpresponse.Errorf("unable to parse proxyConfig from data: %s", err.Error()),
 		)
 	}
 

@@ -26,7 +26,7 @@ type Config struct {
 	Proxies       []url.URL     `env:"PROXIES,delimiter=;"` // List of URL to serve pact-proxy on, e.g. http://localhost:8080;http://localhost:8081
 	WaitDelay     time.Duration `env:"WAIT_DELAY"`          // Default Delay for WaitForInteractions endpoint
 	WaitDuration  time.Duration `env:"WAIT_DURATION"`       // Default Duration for WaitForInteractions endpoint
-	RecordHistory bool          `env:"RECORD_HISTORY`
+	RecordHistory bool          `env:"RECORD_HISTORY"`
 	Target        url.URL       // Do not load Target from env, we set this for each value from Proxies
 }
 
@@ -52,7 +52,6 @@ func (a *api) ProxyRequest(c echo.Context) error {
 }
 
 func StartProxy(e *echo.Echo, config *Config) {
-
 	// Create these once at startup, thay are shared by all server threads
 	a := api{
 		target:        &config.Target,
@@ -83,7 +82,7 @@ func StartProxy(e *echo.Echo, config *Config) {
 	e.POST("/interactions", a.interactionsPostHandler)
 	e.DELETE("/interactions", a.interactionsDeleteHandler)
 
-	e.GET("/interactions/:alias", a.interactionsGetHandler)
+	e.GET("/interactions/details/:alias", a.interactionsGetHandler)
 	e.GET("/interactions/wait", a.interactionsWaitHandler)
 
 	e.Any("/*", a.indexHandler)
@@ -128,7 +127,7 @@ func (a *api) interactionsModifiersHandler(c echo.Context) error {
 	}
 
 	log.Infof("adding modifier to interaction '%s'", interaction.Description)
-	interaction.Modifiers.AddModifier(modifier)
+	interaction.modifiers.AddModifier(modifier)
 
 	return c.NoContent(http.StatusOK)
 }
@@ -287,7 +286,7 @@ func (a *api) indexHandler(c echo.Context) error {
 	request["headers"] = h
 
 	unmatched := make(map[string][]string)
-	matched := make([]*interaction, 0)
+	matched := make([]*Interaction, 0)
 	for _, interaction := range allInteractions {
 		ok, info := interaction.EvaluateConstrains(request, a.interactions)
 		if ok {
