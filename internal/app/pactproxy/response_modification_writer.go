@@ -8,7 +8,7 @@ import (
 
 type ResponseModificationWriter struct {
 	res              http.ResponseWriter
-	interactions     []*interaction
+	interactions     []*Interaction
 	originalResponse []byte
 	statusCode       int
 }
@@ -30,7 +30,7 @@ func (m *ResponseModificationWriter) Write(b []byte) (int, error) {
 
 	var modifiedBody []byte
 	for _, i := range m.interactions {
-		modifiedBody, err = i.Modifiers.modifyBody(m.originalResponse)
+		modifiedBody, err = i.modifiers.modifyBody(m.originalResponse)
 		if err != nil {
 			return 0, err
 		}
@@ -52,7 +52,7 @@ func (m *ResponseModificationWriter) Write(b []byte) (int, error) {
 func (m *ResponseModificationWriter) WriteHeader(statusCode int) {
 	m.statusCode = statusCode
 	for _, i := range m.interactions {
-		ok, code := i.Modifiers.modifyStatusCode()
+		ok, code := i.modifiers.modifyStatusCode()
 		if ok {
 			m.statusCode = code
 			break

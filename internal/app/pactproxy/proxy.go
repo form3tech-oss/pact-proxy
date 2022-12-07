@@ -26,6 +26,7 @@ type Config struct {
 	Proxies       []url.URL     `env:"PROXIES,delimiter=;"` // List of URL to serve pact-proxy on, e.g. http://localhost:8080;http://localhost:8081
 	WaitDelay     time.Duration `env:"WAIT_DELAY"`          // Default Delay for WaitForInteractions endpoint
 	WaitDuration  time.Duration `env:"WAIT_DURATION"`       // Default Duration for WaitForInteractions endpoint
+	RecordHistory bool          `env:"RECORD_HISTORY"`
 	Target        url.URL       // Do not load Target from env, we set this for each value from Proxies
 }
 
@@ -35,12 +36,13 @@ var supportedMediaTypes = map[string]func([]byte, *url.URL) (requestDocument, er
 }
 
 type api struct {
-	target       *url.URL
-	proxy        *httputil.ReverseProxy
-	interactions *Interactions
-	notify       *notify
-	delay        time.Duration
-	duration     time.Duration
+	target        *url.URL
+	proxy         *httputil.ReverseProxy
+	interactions  *Interactions
+	notify        *notify
+	delay         time.Duration
+	duration      time.Duration
+	recordHistory bool
 	echo.Context
 }
 
@@ -50,15 +52,15 @@ func (a *api) ProxyRequest(c echo.Context) error {
 }
 
 func StartProxy(e *echo.Echo, config *Config) {
-
 	// Create these once at startup, thay are shared by all server threads
 	a := api{
-		target:       &config.Target,
-		proxy:        httputil.NewSingleHostReverseProxy(&config.Target),
-		interactions: &Interactions{},
-		notify:       NewNotify(),
-		delay:        config.WaitDelay,
-		duration:     config.WaitDuration,
+		target:        &config.Target,
+		proxy:         httputil.NewSingleHostReverseProxy(&config.Target),
+		interactions:  &Interactions{},
+		notify:        NewNotify(),
+		delay:         config.WaitDelay,
+		duration:      config.WaitDuration,
+		recordHistory: config.RecordHistory,
 	}
 	if a.delay == 0 {
 		a.delay = defaultDelay
@@ -80,6 +82,7 @@ func StartProxy(e *echo.Echo, config *Config) {
 	e.POST("/interactions", a.interactionsPostHandler)
 	e.DELETE("/interactions", a.interactionsDeleteHandler)
 
+	e.GET("/interactions/details/:alias", a.interactionsGetHandler)
 	e.GET("/interactions/wait", a.interactionsWaitHandler)
 
 	e.Any("/*", a.indexHandler)
@@ -124,7 +127,7 @@ func (a *api) interactionsModifiersHandler(c echo.Context) error {
 	}
 
 	log.Infof("adding modifier to interaction '%s'", interaction.Description)
-	interaction.Modifiers.AddModifier(modifier)
+	interaction.modifiers.AddModifier(modifier)
 
 	return c.NoContent(http.StatusOK)
 }
@@ -158,6 +161,7 @@ func (a *api) interactionsPostHandler(c echo.Context) error {
 		log.Infof("storing interaction '%s'", interaction.Description)
 	}
 
+	interaction.recordHistory = a.recordHistory
 	a.interactions.Store(interaction)
 
 	err = c.Request().Body.Close()
@@ -168,6 +172,16 @@ func (a *api) interactionsPostHandler(c echo.Context) error {
 	c.Request().Body = io.NopCloser(bytes.NewBuffer(data))
 
 	return a.ProxyRequest(c)
+}
+
+func (a *api) interactionsGetHandler(c echo.Context) error {
+	alias := c.Param("alias")
+	interaction, found := a.interactions.Load(alias)
+	if !found {
+		return c.JSON(http.StatusBadRequest, httpresponse.Errorf("interaction %q not found", alias))
+	}
+
+	return c.JSON(http.StatusOK, interaction)
 }
 
 func (a *api) interactionsWaitHandler(c echo.Context) error {
@@ -272,7 +286,7 @@ func (a *api) indexHandler(c echo.Context) error {
 	request["headers"] = h
 
 	unmatched := make(map[string][]string)
-	matched := make([]*interaction, 0)
+	matched := make([]*Interaction, 0)
 	for _, interaction := range allInteractions {
 		ok, info := interaction.EvaluateConstrains(request, a.interactions)
 		if ok {

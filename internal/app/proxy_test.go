@@ -377,3 +377,20 @@ func TestEmptyContentTypeDefaultsToPlainText(t *testing.T) {
 		the_response_is_(http.StatusOK).and().
 		the_response_body_to_plain_text_request_is_correct()
 }
+
+func TestGetInteractionDetailsAndHistory(t *testing.T) {
+	config := ProxyConfig{RecordHistory: true}
+	given, when, then := NewProxyStageWithConfig(t, config)
+
+	given.
+		the_record_history_config_option_is_enabled().and().
+		a_pact_that_allows_any_names()
+
+	when.
+		multiple_requests_are_sent_using_the_names("rod", "jane", "freddy")
+
+	then.
+		pact_verification_is_successful().and().
+		the_proxy_waits_for_all_requests().and().
+		the_proxy_returns_details_of_all_requests()
+}

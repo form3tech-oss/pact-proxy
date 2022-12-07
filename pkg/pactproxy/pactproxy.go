@@ -3,13 +3,14 @@ package pactproxy
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -130,6 +131,25 @@ func (p *PactProxy) WaitForInteraction(interaction string, count int) error {
 		return errors.New("fail")
 	}
 	return nil
+}
+
+func (p *PactProxy) ReadInteractionDetails(alias string) (*Interaction, error) {
+	url := fmt.Sprintf("%s/interactions/details/%s", strings.TrimSuffix(p.url, "/"), alias)
+	r, _ := http.NewRequest("GET", url, nil)
+	res, err := p.client.Do(r)
+	if err != nil {
+		return nil, errors.Wrap(err, "http get")
+	}
+	if res.StatusCode != http.StatusOK {
+		return nil, errors.New("fail")
+	}
+	interaction := &Interaction{}
+	err = json.NewDecoder(res.Body).Decode(interaction)
+	if err != nil {
+		return nil, err
+	}
+
+	return interaction, nil
 }
 
 func (p *PactProxy) IsReady() error {

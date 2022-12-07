@@ -15,7 +15,7 @@ func ParseJSONRequest(data []byte, url *url.URL) (requestDocument, error) {
 	if len(data) > 0 {
 		err := json.Unmarshal(data, &body)
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to parse requestDocument body")
+			return nil, errors.Wrap(err, "unable to parse RequestDocument body")
 		}
 	}
 	queryValues := parseQueryValues(url)

@@ -16,7 +16,7 @@ type interactionModifier struct {
 }
 
 type interactionModifiers struct {
-	interaction *interaction
+	interaction *Interaction
 	modifiers   map[string]*interactionModifier
 }
 

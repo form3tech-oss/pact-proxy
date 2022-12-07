@@ -8,7 +8,7 @@ type Interactions struct {
 	interactions sync.Map
 }
 
-func (i *Interactions) Store(interaction *interaction) {
+func (i *Interactions) Store(interaction *Interaction) {
 	i.interactions.Store(interaction.Description, interaction)
 	if interaction.Alias != "" {
 		i.interactions.Store(interaction.Alias, interaction)
@@ -22,20 +22,20 @@ func (i *Interactions) Clear() {
 	})
 }
 
-func (i *Interactions) Load(key string) (*interaction, bool) {
+func (i *Interactions) Load(key string) (*Interaction, bool) {
 	result, ok := i.interactions.Load(key)
 	if !ok {
 		return nil, false
 	}
-	return result.(*interaction), true
+	return result.(*Interaction), true
 }
 
-func (i *Interactions) FindAll(path, method string) ([]*interaction, bool) {
-	interactions := make(map[string]*interaction)
-	var result []*interaction
+func (i *Interactions) FindAll(path, method string) ([]*Interaction, bool) {
+	interactions := make(map[string]*Interaction)
+	var result []*Interaction
 	i.interactions.Range(func(_, v interface{}) bool {
-		if v.(*interaction).Match(path, method) {
-			i := v.(*interaction)
+		if v.(*Interaction).Match(path, method) {
+			i := v.(*Interaction)
 			interactions[i.Description] = i
 		}
 		return true
@@ -48,10 +48,10 @@ func (i *Interactions) FindAll(path, method string) ([]*interaction, bool) {
 	return result, len(result) > 0
 }
 
-func (i *Interactions) All() []*interaction {
-	var interactions []*interaction
+func (i *Interactions) All() []*Interaction {
+	var interactions []*Interaction
 	i.interactions.Range(func(_, v interface{}) bool {
-		interactions = append(interactions, v.(*interaction))
+		interactions = append(interactions, v.(*Interaction))
 		return true
 	})
 	return interactions
@@ -60,7 +60,7 @@ func (i *Interactions) All() []*interaction {
 func (i *Interactions) AllHaveRequests() bool {
 	result := true
 	i.interactions.Range(func(_, v interface{}) bool {
-		if !v.(*interaction).HasRequests(1) {
+		if !v.(*Interaction).HasRequests(1) {
 			result = false
 			return false
 		}
