@@ -2,6 +2,7 @@ package configuration
 
 import (
 	"context"
+	"net/url"
 
 	"github.com/form3tech-oss/pact-proxy/internal/app/pactproxy"
 	"github.com/pkg/errors"
@@ -20,7 +21,15 @@ func NewFromEnv() (pactproxy.Config, error) {
 }
 
 func ConfigureProxy(config pactproxy.Config) error {
-	server, err := GetServer(&config.ServerAddress)
+	targetURL := config.Target
+
+	// If ServerAddress is not passed, listen on the target port
+	serverAddr := config.ServerAddress
+	if (serverAddr == url.URL{}) {
+		serverAddr = url.URL{Scheme: "http", Host: ":" + targetURL.Port()}
+	}
+
+	server, err := GetServer(&serverAddr)
 	if err != nil {
 		return err
 	}
