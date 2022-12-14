@@ -7,7 +7,6 @@ import (
 	"syscall"
 
 	"github.com/form3tech-oss/pact-proxy/internal/app/configuration"
-	"github.com/form3tech-oss/pact-proxy/internal/app/pactproxy"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -17,8 +16,11 @@ func main() {
 		log.WithError(err).Fatal("unable to load configuration")
 	}
 	for _, proxy := range config.Proxies {
-		log.Infof("setting up proxy for %s", proxy)
-		if err := configuration.ConfigureProxy(pactproxy.Config{Target: proxy}); err != nil {
+		log.Infof("setting up proxy for %s", proxy.String())
+
+		proxyConfig := config
+		proxyConfig.Target = proxy
+		if err := configuration.ConfigureProxy(proxyConfig); err != nil {
 			panic(err)
 		}
 	}
