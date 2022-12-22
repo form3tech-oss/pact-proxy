@@ -46,6 +46,11 @@ type api struct {
 	echo.Context
 }
 
+type matchedInteraction struct {
+	interaction  *Interaction
+	requestCount int
+}
+
 func (a *api) ProxyRequest(c echo.Context) error {
 	a.proxy.ServeHTTP(c.Response(), c.Request())
 	return nil
@@ -286,12 +291,14 @@ func (a *api) indexHandler(c echo.Context) error {
 	request["headers"] = h
 
 	unmatched := make(map[string][]string)
-	matched := make([]*Interaction, 0)
+	matched := make([]matchedInteraction, 0)
 	for _, interaction := range allInteractions {
 		ok, info := interaction.EvaluateConstrains(request, a.interactions)
 		if ok {
-			interaction.StoreRequest(request)
-			matched = append(matched, interaction)
+			matched = append(matched, matchedInteraction{
+				interaction:  interaction,
+				requestCount: interaction.StoreRequest(request),
+			})
 		} else {
 			unmatched[interaction.Description] = info
 		}
@@ -306,7 +313,7 @@ func (a *api) indexHandler(c echo.Context) error {
 	}
 
 	a.notify.Notify()
-	a.proxy.ServeHTTP(&ResponseModificationWriter{res: c.Response(), interactions: matched}, req)
+	a.proxy.ServeHTTP(&ResponseModificationWriter{res: c.Response(), matchedInteractions: matched}, req)
 	return nil
 }
 

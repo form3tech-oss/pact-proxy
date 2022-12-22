@@ -40,9 +40,8 @@ func (ims *interactionModifiers) Modifiers() []*interactionModifier {
 	return result
 }
 
-func (ims *interactionModifiers) modifyBody(b []byte) ([]byte, error) {
+func (ims *interactionModifiers) modifyBody(b []byte, requestCount int) ([]byte, error) {
 	for _, m := range ims.Modifiers() {
-		requestCount := ims.interaction.getRequestCount()
 		if strings.HasPrefix(m.Path, "$.body.") {
 			if m.Attempt == nil || *m.Attempt == requestCount {
 				var err error
@@ -56,9 +55,8 @@ func (ims *interactionModifiers) modifyBody(b []byte) ([]byte, error) {
 	return b, nil
 }
 
-func (ims *interactionModifiers) modifyStatusCode() (bool, int) {
+func (ims *interactionModifiers) modifyStatusCode(requestCount int) (bool, int) {
 	for _, m := range ims.Modifiers() {
-		requestCount := ims.interaction.getRequestCount()
 		if m.Path == "$.status" {
 			if m.Attempt == nil || *m.Attempt == requestCount {
 				code, err := strconv.Atoi(fmt.Sprintf("%v", m.Value))

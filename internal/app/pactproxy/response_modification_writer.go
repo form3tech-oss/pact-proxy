@@ -7,10 +7,11 @@ import (
 )
 
 type ResponseModificationWriter struct {
-	res              http.ResponseWriter
-	interactions     []*Interaction
-	originalResponse []byte
-	statusCode       int
+	request             requestDocument
+	res                 http.ResponseWriter
+	matchedInteractions []matchedInteraction
+	originalResponse    []byte
+	statusCode          int
 }
 
 func (m *ResponseModificationWriter) Header() http.Header {
@@ -29,8 +30,8 @@ func (m *ResponseModificationWriter) Write(b []byte) (int, error) {
 	}
 
 	var modifiedBody []byte
-	for _, i := range m.interactions {
-		modifiedBody, err = i.modifiers.modifyBody(m.originalResponse)
+	for _, match := range m.matchedInteractions {
+		modifiedBody, err = match.interaction.modifiers.modifyBody(m.originalResponse, match.requestCount)
 		if err != nil {
 			return 0, err
 		}
@@ -51,8 +52,8 @@ func (m *ResponseModificationWriter) Write(b []byte) (int, error) {
 
 func (m *ResponseModificationWriter) WriteHeader(statusCode int) {
 	m.statusCode = statusCode
-	for _, i := range m.interactions {
-		ok, code := i.modifiers.modifyStatusCode()
+	for _, match := range m.matchedInteractions {
+		ok, code := match.interaction.modifiers.modifyStatusCode(match.requestCount)
 		if ok {
 			m.statusCode = code
 			break
