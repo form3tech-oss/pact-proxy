@@ -25,6 +25,7 @@ type ConcurrentProxyStage struct {
 	proxy                              *pactproxy.PactProxy
 	pact                               *dsl.Pact
 	modifiedNameStatusCode             int
+	modifiedNameAttempt                *int
 	modifiedAddressStatusCode          int
 	concurrentUserRequestsPerSecond    int
 	concurrentUserRequestsDuration     time.Duration
@@ -62,6 +63,10 @@ func (s *ConcurrentProxyStage) and() *ConcurrentProxyStage {
 func (s *ConcurrentProxyStage) a_modified_name_status_code() *ConcurrentProxyStage {
 	s.modifiedNameStatusCode = http.StatusBadGateway
 	return s
+}
+
+func (s *ConcurrentProxyStage) a_modified_name_response_attempt_of(i int) {
+	s.modifiedNameAttempt = &i
 }
 
 func (s *ConcurrentProxyStage) a_modified_address_status_code() *ConcurrentProxyStage {
@@ -122,7 +127,7 @@ func (s *ConcurrentProxyStage) x_concurrent_address_requests_per_second_are_made
 func (s *ConcurrentProxyStage) the_concurrent_requests_are_sent() {
 	err := s.pact.Verify(func() (err error) {
 		if s.modifiedNameStatusCode != 0 {
-			s.proxy.ForInteraction(postNamePactWithAnyName).AddModifier("$.status", fmt.Sprintf("%d", s.modifiedNameStatusCode), nil)
+			s.proxy.ForInteraction(postNamePactWithAnyName).AddModifier("$.status", fmt.Sprintf("%d", s.modifiedNameStatusCode), s.modifiedNameAttempt)
 		}
 		if s.modifiedAddressStatusCode != 0 {
 			s.proxy.ForInteraction(postAddressPact).AddModifier("$.status", fmt.Sprintf("%d", s.modifiedAddressStatusCode), nil)
@@ -184,9 +189,17 @@ func sendConcurrentRequests(requests int, d time.Duration, f func()) {
 			case <-stop:
 				return
 			case <-ticker.C:
+				var wg sync.WaitGroup
+
 				for i := 0; i < requests; i++ {
-					f()
+					wg.Add(1)
+
+					go func() {
+						defer wg.Done()
+						f()
+					}()
 				}
+				wg.Wait()
 			}
 		}
 	}()
@@ -199,8 +212,12 @@ func (s *ConcurrentProxyStage) all_the_user_responses_should_have_the_right_stat
 	expectedLen := s.concurrentUserRequestsPerSecond * int(s.concurrentUserRequestsDuration/time.Second)
 	s.assert.Len(s.userResponses, expectedLen, "number of user responses is not as expected")
 
-	for _, res := range s.userResponses {
-		s.assert.Equal(res.StatusCode, s.modifiedNameStatusCode, "expected user status code")
+	for i, res := range s.userResponses {
+		if s.modifiedNameAttempt == nil || *s.modifiedNameAttempt == i+1 {
+			s.assert.Equal(res.StatusCode, s.modifiedNameStatusCode, "expected user status code")
+		} else {
+			s.assert.Equal(res.StatusCode, 200, "expected user status code")
+		}
 	}
 
 	return s
