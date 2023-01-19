@@ -274,7 +274,7 @@ func createCertificates() error {
 }
 
 func cleanupCertificates() {
-	// os.Remove("test_ca.pem")
-	// os.Remove("test_client.pem")
-	// os.Remove("test_client.key")
+	os.Remove("test_ca.pem")
+	os.Remove("test_client.pem")
+	os.Remove("test_client.key")
 }
