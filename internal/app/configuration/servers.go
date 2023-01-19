@@ -98,6 +98,9 @@ func newServer(url *url.URL, config *pactproxy.Config) *http.Server {
 	}
 
 	if config.TLSCAFile != "" {
+		if config.TLSCertFile == "" || config.TLSKeyFile == "" {
+			log.Fatalf("cannot run in mTLS mode without TLS cert and key")
+		}
 
 		caCertFile, err := os.ReadFile(config.TLSCAFile)
 		if err != nil {
