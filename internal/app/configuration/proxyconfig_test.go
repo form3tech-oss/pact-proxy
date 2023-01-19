@@ -27,7 +27,7 @@ import (
 )
 
 // This test ensures that the correct proxy backend is called, and correct response returned
-// for two proxy backends listening on different ports
+// for two proxy backends listening on different ports.
 func TestConfigureProxy_Port(t *testing.T) {
 	defer ShutdownAllServers(context.Background())
 
@@ -67,7 +67,7 @@ func TestConfigureProxy_Port(t *testing.T) {
 }
 
 // This test ensures that the correct proxy backend is called, and correct response returned
-// for two proxy backends listening on different paths
+// for two proxy backends listening on different paths.
 func TestProxyConfig_Path(t *testing.T) {
 	defer ShutdownAllServers(context.Background())
 
@@ -166,7 +166,7 @@ func TestConfigureProxy_TLS(t *testing.T) {
 	}
 }
 
-// gets a free port on the localhost and returns it as a url
+// gets a free port on the localhost and returns it as a url.
 func getFreePortURL() (*url.URL, error) {
 	addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
 	if err != nil {

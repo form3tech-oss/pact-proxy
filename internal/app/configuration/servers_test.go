@@ -9,7 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// This test ensures that the server will start up correctly (or error) for different combinations of host, port and path
+// This test ensures that the server will start up correctly (or error)
+// for different combinations of host, port and path.
 func TestGetServer(t *testing.T) {
 	type testCase struct {
 		name        string

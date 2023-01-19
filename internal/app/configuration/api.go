@@ -36,7 +36,6 @@ func deleteProxiesHandler(c echo.Context) error {
 }
 
 func postProxiesHandler(c echo.Context) error {
-
 	proxyConfig := pactproxy.Config{}
 	err := c.Bind(&proxyConfig)
 	if err != nil {
