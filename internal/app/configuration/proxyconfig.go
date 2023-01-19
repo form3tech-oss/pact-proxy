@@ -17,6 +17,7 @@ func NewFromEnv() (pactproxy.Config, error) {
 	if err != nil {
 		return config, errors.Wrap(err, "process env config")
 	}
+
 	return config, nil
 }
 
@@ -29,11 +30,5 @@ func ConfigureProxy(config pactproxy.Config) error {
 		serverAddr = url.URL{Scheme: "http", Host: ":" + targetURL.Port()}
 	}
 
-	server, err := GetServer(&serverAddr)
-	if err != nil {
-		return err
-	}
-
-	pactproxy.StartProxy(server, &config)
-	return err
+	return GetServer(&serverAddr, &config)
 }

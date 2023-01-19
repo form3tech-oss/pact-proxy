@@ -23,6 +23,8 @@ pact-go
 pact/
 .serverport
 internal/app/pacts/myconsumer-myprovider.json
+internal/app/configuration/test_*.key
+internal/app/configuration/test_*.pem
 
 # logs
 *.log

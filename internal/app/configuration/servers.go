@@ -1,65 +1,122 @@
 package configuration
 
 import (
+	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 
+	"github.com/form3tech-oss/pact-proxy/internal/app/pactproxy"
 	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 	log "github.com/sirupsen/logrus"
 )
 
 var servers sync.Map
+var hostPaths sync.Map
 
-func GetServer(url *url.URL) (*echo.Echo, error) {
-	rootServer, loaded := loadOrStoreHandler(url.Host, echo.New())
+func GetServer(url *url.URL, config *pactproxy.Config) error {
+	rootServer, loaded := loadServer(url.Host)
 	if !loaded {
+		rootServer = newServer(url, config)
+		servers.Store(url.Host, rootServer)
 		go func() {
-			rootServer.HideBanner = true
-			if err := rootServer.Start(url.Host); err != nil {
-				if err != http.ErrServerClosed {
-					log.Error(err)
-				}
+			var err error
+			if config.TLSCertFile != "" && config.TLSKeyFile != "" {
+				err = rootServer.ListenAndServeTLS(config.TLSCertFile, config.TLSKeyFile)
+			} else {
+				err = rootServer.ListenAndServe()
+			}
+			if err != nil && err != http.ErrServerClosed {
+				log.Error(err)
 			}
 		}()
+		return nil
 	}
 
 	if strings.TrimLeft(url.Path, "/") == "" {
 		if loaded {
-			return nil, fmt.Errorf("proxy already running at %s", url.String())
+			// don't allow two servers on the same address, with empty path
+			return fmt.Errorf("proxy already running at %s", url.String())
 		}
-		return rootServer, nil
+		return nil
 	}
 
-	addr := fmt.Sprintf("%s/%s", url.Host, strings.TrimLeft(url.Path, "/"))
-	proxyServer, loaded := loadOrStoreHandler(addr, echo.New())
-	if loaded {
-		return nil, fmt.Errorf("proxy already running at %s", addr)
+	// This is a new path for an existing server, so add another rewrite rule
+	e := rootServer.Handler.(*echo.Echo)
+
+	// don't allow two servers on the same address, with same path
+	_, found := hostPaths.Load(url.Path)
+	if found {
+		return fmt.Errorf("proxy already running at %s", url.String())
 	}
-	proxyServer.HideBanner = true
+	hostPaths.Store(url.Path, true)
+	addRewrite(e, url.Path)
 
-	rootServer.Any(url.Path+"/", echo.WrapHandler(http.StripPrefix(url.Path, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		proxyServer.ServeHTTP(w, r)
-	}))))
-
-	return proxyServer, nil
+	return nil
 }
 
-func loadOrStoreHandler(addr string, defaultServer *echo.Echo) (*echo.Echo, bool) {
-	server, loaded := servers.LoadOrStore(addr, defaultServer)
-	return server.(*echo.Echo), loaded
+func loadServer(addr string) (*http.Server, bool) {
+	server, loaded := servers.Load(addr)
+	if !loaded {
+		return nil, false
+	}
+	return server.(*http.Server), loaded
 }
 
-func CloseAllServers() {
+func ShutdownAllServers(ctx context.Context) {
 	servers.Range(func(key, _ interface{}) bool {
 		server, loaded := servers.LoadAndDelete(key)
 		if loaded {
-			if err := server.(*echo.Echo).Close(); err != nil {
+			if err := server.(*http.Server).Shutdown(ctx); err != nil {
 				log.Error(err)
 			}
 		}
 		return true
 	})
+}
+
+func newServer(url *url.URL, config *pactproxy.Config) *http.Server {
+	e := echo.New()
+	e.HideBanner = true
+
+	pactproxy.SetupRoutes(e, config)
+
+	s := http.Server{
+		Addr:    url.Host,
+		Handler: e,
+	}
+
+	if config.TLSCAFile != "" {
+
+		caCertFile, err := os.ReadFile(config.TLSCAFile)
+		if err != nil {
+			log.Fatalf("error reading CA certificate: %v", err)
+		}
+		certPool := x509.NewCertPool()
+		certPool.AppendCertsFromPEM(caCertFile)
+		s.TLSConfig = &tls.Config{
+			ClientAuth: tls.RequireAndVerifyClientCert,
+			ClientCAs:  certPool,
+			MinVersion: tls.VersionTLS12,
+		}
+	}
+
+	if strings.TrimLeft(url.Path, "/") != "" {
+		hostPaths.Store(url.Path, true)
+		addRewrite(e, url.Path)
+	}
+
+	return &s
+}
+
+func addRewrite(e *echo.Echo, path string) {
+	e.Pre(middleware.Rewrite(map[string]string{
+		path + "/": "/",
+	}))
 }

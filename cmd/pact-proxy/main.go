@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"os"
 	"os/signal"
 	"strconv"
@@ -40,5 +41,5 @@ func main() {
 		panic(err)
 	}
 
-	configuration.CloseAllServers()
+	configuration.ShutdownAllServers(context.Background())
 }
