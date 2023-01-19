@@ -100,7 +100,7 @@ func TestGetServer(t *testing.T) {
 			require.NoError(t, err)
 
 			err = GetServer(url2, &pactproxy.Config{})
-			require.Equal(t, tc.shouldError, err != nil)
+			require.Equalf(t, tc.shouldError, err != nil, "found error: %s", err)
 		})
 	}
 }
