@@ -20,7 +20,8 @@ func ServeAdminAPI(port int) *echo.Echo {
 
 	go func() {
 		address := fmt.Sprintf(":%d", port)
-		if err := adminServer.Start(address); err != nil {
+		err := adminServer.Start(address)
+		if err != nil && err != http.ErrServerClosed {
 			log.Fatal(err)
 		}
 	}()
