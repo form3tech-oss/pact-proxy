@@ -79,6 +79,11 @@ func ShutdownAllServers(ctx context.Context) {
 		}
 		return true
 	})
+
+	hostPaths.Range(func(key, value any) bool {
+		hostPaths.Delete(key)
+		return true
+	})
 }
 
 func newServer(url *url.URL, config *pactproxy.Config) *http.Server {
@@ -117,6 +122,6 @@ func newServer(url *url.URL, config *pactproxy.Config) *http.Server {
 
 func addRewrite(e *echo.Echo, path string) {
 	e.Pre(middleware.Rewrite(map[string]string{
-		path + "/": "/",
+		path + "/*": "/$1",
 	}))
 }
