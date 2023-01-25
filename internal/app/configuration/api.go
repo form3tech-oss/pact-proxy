@@ -44,7 +44,7 @@ func postProxiesHandler(c echo.Context) error {
 		)
 	}
 
-	log.Infof("setting up proxy from %s to %s", proxyConfig.ServerAddress, proxyConfig.Target)
+	log.Infof("setting up proxy from %s to %s", proxyConfig.ServerAddress.String(), proxyConfig.Target.String())
 
 	err = ConfigureProxy(proxyConfig)
 	if err != nil {
