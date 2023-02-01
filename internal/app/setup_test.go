@@ -13,13 +13,11 @@ import (
 
 	"github.com/pact-foundation/pact-go/dsl"
 
-	"github.com/form3tech-oss/pact-proxy/internal/app/configuration"
 	"github.com/pact-foundation/pact-go/utils"
 )
 
 var (
 	pathOnce               sync.Once
-	adminURL               *url.URL
 	proxyURL               *url.URL
 	pact                   *dsl.Pact
 	originalPactServerPort int
@@ -27,18 +25,6 @@ var (
 
 func TestMain(m *testing.M) {
 	setPathOnce()
-	adminPort, err := utils.GetFreePort()
-	if err != nil {
-		panic(err)
-	}
-
-	adminServer := configuration.ServeAdminAPI(adminPort)
-	defer adminServer.Close()
-
-	adminURL, err = url.Parse(fmt.Sprintf("http://localhost:%d", adminPort))
-	if err != nil {
-		panic(err)
-	}
 
 	proxyPort, err := utils.GetFreePort()
 	if err != nil {

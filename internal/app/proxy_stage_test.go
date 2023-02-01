@@ -15,6 +15,8 @@ import (
 	"time"
 
 	"github.com/avast/retry-go/v4"
+	"github.com/form3tech-oss/pact-proxy/internal/app/configuration"
+	internal "github.com/form3tech-oss/pact-proxy/internal/app/pactproxy"
 	"github.com/form3tech-oss/pact-proxy/pkg/pactproxy"
 	"github.com/pact-foundation/pact-go/dsl"
 	"github.com/pkg/errors"
@@ -71,7 +73,7 @@ func NewProxyStageWithConfig(t *testing.T, config ProxyConfig) (*ProxyStage, *Pr
 	}
 
 	s.t.Cleanup(func() {
-		pactproxy.Configuration(adminURL.String()).Reset()
+		configuration.CloseAllServers()
 	})
 
 	return s, s, s
@@ -80,13 +82,12 @@ func NewProxyStageWithConfig(t *testing.T, config ProxyConfig) (*ProxyStage, *Pr
 func setupAndWaitForProxy(config ProxyConfig) (*pactproxy.PactProxy, error) {
 	target := url.URL{Scheme: "http", Host: fmt.Sprintf("%s:%d", pact.Host, originalPactServerPort)}
 
-	proxy, err := pactproxy.
-		Configuration(adminURL.String()).
-		SetupProxyWithConfig(&pactproxy.Config{
-			ServerAddress: *proxyURL,
-			Target:        target,
-			RecordHistory: config.RecordHistory,
-		})
+	// first start the proxy
+	err := configuration.ConfigureProxy(internal.Config{
+		ServerAddress: *proxyURL,
+		Target:        target,
+		RecordHistory: config.RecordHistory,
+	})
 	if err != nil {
 		return nil, errors.Wrap(err, "proxy setup failed")
 	}
@@ -96,6 +97,7 @@ func setupAndWaitForProxy(config ProxyConfig) (*pactproxy.PactProxy, error) {
 		retry.DelayType(retry.FixedDelay),
 		retry.Delay(500 * time.Millisecond),
 	}
+	proxy := pactproxy.New(proxyURL.String())
 
 	err = retry.Do(proxy.IsReady, retryOpts...)
 	if err != nil {
