@@ -179,17 +179,12 @@ func TestConfigureProxy_MTLS(t *testing.T) {
 
 // gets a free port on the localhost and returns it as a url.
 func getFreePortURL() (*url.URL, error) {
-	addr, err := net.ResolveTCPAddr("tcp", "localhost:0")
+	port, err := utils.GetFreePort()
 	if err != nil {
 		return nil, err
 	}
 
-	l, err := net.ListenTCP("tcp", addr)
-	if err != nil {
-		return nil, err
-	}
-	defer l.Close()
-	urlStr := fmt.Sprintf("http://localhost:%d", l.Addr().(*net.TCPAddr).Port)
+	urlStr := fmt.Sprintf("http://localhost:%d", port)
 	return url.Parse(urlStr)
 }
 
