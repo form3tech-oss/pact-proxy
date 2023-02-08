@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"os"
 	"strings"
-	"sync"
 
 	"github.com/form3tech-oss/pact-proxy/internal/app/pactproxy"
 	"github.com/labstack/echo/v4"
@@ -17,14 +16,14 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var servers sync.Map
-var hostPaths sync.Map
+var servers = map[string]*http.Server{}
+var hostPaths = map[string]bool{}
 
 func StartServer(url *url.URL, config *pactproxy.Config) error {
-	rootServer, loaded := loadServer(url.Host)
+	rootServer, loaded := servers[url.Host]
 	if !loaded {
 		rootServer = newServer(url, config)
-		servers.Store(url.Host, rootServer)
+		servers[url.Host] = rootServer
 		go func() {
 			var err error
 			if config.TLSCertFile != "" && config.TLSKeyFile != "" {
@@ -51,39 +50,25 @@ func StartServer(url *url.URL, config *pactproxy.Config) error {
 	e := rootServer.Handler.(*echo.Echo)
 
 	// don't allow two servers on the same address, with same path
-	_, found := hostPaths.Load(url.Path)
+	_, found := hostPaths[url.Path]
 	if found {
 		return fmt.Errorf("proxy already running at %s", url.String())
 	}
-	hostPaths.Store(url.Path, true)
+	hostPaths[url.Path] = true
 	addRewrite(e, url.Path)
 
 	return nil
 }
 
-func loadServer(addr string) (*http.Server, bool) {
-	server, loaded := servers.Load(addr)
-	if !loaded {
-		return nil, false
-	}
-	return server.(*http.Server), loaded
-}
-
 func ShutdownAllServers(ctx context.Context) {
-	servers.Range(func(key, _ interface{}) bool {
-		server, loaded := servers.LoadAndDelete(key)
-		if loaded {
-			if err := server.(*http.Server).Shutdown(ctx); err != nil {
-				log.Error(err)
-			}
+	for addr, server := range servers {
+		if err := server.Shutdown(ctx); err != nil {
+			log.Error(err)
 		}
-		return true
-	})
+		delete(servers, addr)
+	}
 
-	hostPaths.Range(func(key, value any) bool {
-		hostPaths.Delete(key)
-		return true
-	})
+	hostPaths = map[string]bool{}
 }
 
 func newServer(url *url.URL, config *pactproxy.Config) *http.Server {
@@ -116,7 +101,7 @@ func newServer(url *url.URL, config *pactproxy.Config) *http.Server {
 	}
 
 	if strings.TrimLeft(url.Path, "/") != "" {
-		hostPaths.Store(url.Path, true)
+		hostPaths[url.Path] = true
 		addRewrite(e, url.Path)
 	}
 
