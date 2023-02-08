@@ -96,10 +96,10 @@ func TestGetServer(t *testing.T) {
 			url2, err := url.Parse(tc.url2)
 			require.NoError(t, err)
 
-			err = GetServer(url1, &pactproxy.Config{})
+			err = StartServer(url1, &pactproxy.Config{})
 			require.NoError(t, err)
 
-			err = GetServer(url2, &pactproxy.Config{})
+			err = StartServer(url2, &pactproxy.Config{})
 			require.Equalf(t, tc.shouldError, err != nil, "found error: %s", err)
 		})
 	}

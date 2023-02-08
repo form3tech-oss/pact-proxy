@@ -30,5 +30,5 @@ func ConfigureProxy(config pactproxy.Config) error {
 		serverAddr = url.URL{Scheme: "http", Host: ":" + targetURL.Port()}
 	}
 
-	return GetServer(&serverAddr, &config)
+	return StartServer(&serverAddr, &config)
 }

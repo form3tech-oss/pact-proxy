@@ -20,7 +20,7 @@ import (
 var servers sync.Map
 var hostPaths sync.Map
 
-func GetServer(url *url.URL, config *pactproxy.Config) error {
+func StartServer(url *url.URL, config *pactproxy.Config) error {
 	rootServer, loaded := loadServer(url.Host)
 	if !loaded {
 		rootServer = newServer(url, config)
