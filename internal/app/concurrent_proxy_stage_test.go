@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -8,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/form3tech-oss/pact-proxy/internal/app/configuration"
 	"github.com/form3tech-oss/pact-proxy/pkg/pactproxy"
 	"github.com/pact-foundation/pact-go/dsl"
 	log "github.com/sirupsen/logrus"
@@ -49,7 +51,7 @@ func NewConcurrentProxyStage(t *testing.T) (*ConcurrentProxyStage, *ConcurrentPr
 	}
 
 	t.Cleanup(func() {
-		pactproxy.Configuration(adminURL.String()).Reset()
+		configuration.ShutdownAllServers(context.Background())
 	})
 
 	return s, s, s
