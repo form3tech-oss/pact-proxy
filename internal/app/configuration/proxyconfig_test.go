@@ -26,6 +26,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	testCAFile   = "test_ca.pem"
+	testCertFile = "test_client.pem"
+	testKeyFile  = "test_client.key"
+)
+
 // This test ensures that the correct proxy backend is called, and correct response returned
 // for two proxy backends listening on different ports.
 func TestConfigureProxy_Port(t *testing.T) {
@@ -141,9 +147,9 @@ func TestConfigureProxy_MTLS(t *testing.T) {
 		config := pactproxy.Config{
 			ServerAddress: serverAddr,
 			Target:        *url1,
-			TLSCAFile:     "test_ca.pem",
-			TLSCertFile:   "test_client.pem",
-			TLSKeyFile:    "test_client.key",
+			TLSCAFile:     testCAFile,
+			TLSCertFile:   testCertFile,
+			TLSKeyFile:    testKeyFile,
 		}
 
 		err = ConfigureProxy(config)
@@ -277,9 +283,9 @@ func createCertificates() ([]byte, []byte, []byte, error) {
 	}
 
 	certOutput := map[string][]byte{
-		"test_ca.pem":     caPEM.Bytes(),
-		"test_client.pem": certPEM.Bytes(),
-		"test_client.key": certPrivKeyPEM.Bytes(),
+		testCAFile:   caPEM.Bytes(),
+		testCertFile: certPEM.Bytes(),
+		testKeyFile:  certPrivKeyPEM.Bytes(),
 	}
 
 	for file, content := range certOutput {
@@ -292,7 +298,7 @@ func createCertificates() ([]byte, []byte, []byte, error) {
 }
 
 func cleanupCertificates() {
-	os.Remove("test_ca.pem")
-	os.Remove("test_client.pem")
-	os.Remove("test_client.key")
+	os.Remove(testCAFile)
+	os.Remove(testCertFile)
+	os.Remove(testKeyFile)
 }
