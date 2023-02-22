@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -50,7 +51,7 @@ func NewConcurrentProxyStage(t *testing.T) (*ConcurrentProxyStage, *ConcurrentPr
 	}
 
 	t.Cleanup(func() {
-		configuration.CloseAllServers()
+		configuration.ShutdownAllServers(context.Background())
 	})
 
 	return s, s, s

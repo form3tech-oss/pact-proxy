@@ -27,6 +27,9 @@ type Config struct {
 	WaitDelay     time.Duration `env:"WAIT_DELAY"`          // Default Delay for WaitForInteractions endpoint
 	WaitDuration  time.Duration `env:"WAIT_DURATION"`       // Default Duration for WaitForInteractions endpoint
 	RecordHistory bool          `env:"RECORD_HISTORY"`
+	TLSCAFile     string        `env:"TLS_CA_FILE"`
+	TLSCertFile   string        `env:"TLS_CERT_FILE"`
+	TLSKeyFile    string        `env:"TLS_KEY_FILE"`
 	Target        url.URL       // Do not load Target from env, we set this for each value from Proxies
 }
 
@@ -51,7 +54,7 @@ func (a *api) ProxyRequest(c echo.Context) error {
 	return nil
 }
 
-func StartProxy(e *echo.Echo, config *Config) {
+func SetupRoutes(e *echo.Echo, config *Config) {
 	// Create these once at startup, thay are shared by all server threads
 	a := api{
 		target:        &config.Target,

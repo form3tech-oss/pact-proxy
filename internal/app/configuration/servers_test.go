@@ -1,12 +1,16 @@
 package configuration
 
 import (
+	"context"
 	"net/url"
 	"testing"
 
+	"github.com/form3tech-oss/pact-proxy/internal/app/pactproxy"
 	"github.com/stretchr/testify/require"
 )
 
+// This test ensures that the server will start up correctly (or error)
+// for different combinations of host, port and path.
 func TestGetServer(t *testing.T) {
 	type testCase struct {
 		name        string
@@ -84,7 +88,7 @@ func TestGetServer(t *testing.T) {
 		},
 	} {
 		t.Run(tc.name, func(st *testing.T) {
-			defer CloseAllServers()
+			defer ShutdownAllServers(context.Background())
 
 			url1, err := url.Parse(tc.url1)
 			require.NoError(t, err)
@@ -92,11 +96,11 @@ func TestGetServer(t *testing.T) {
 			url2, err := url.Parse(tc.url2)
 			require.NoError(t, err)
 
-			_, err = GetServer(url1)
+			err = StartServer(url1, &pactproxy.Config{})
 			require.NoError(t, err)
 
-			_, err = GetServer(url2)
-			require.Equal(t, tc.shouldError, err != nil)
+			err = StartServer(url2, &pactproxy.Config{})
+			require.Equalf(t, tc.shouldError, err != nil, "found error: %s", err)
 		})
 	}
 }

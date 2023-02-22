@@ -73,7 +73,7 @@ func NewProxyStageWithConfig(t *testing.T, config ProxyConfig) (*ProxyStage, *Pr
 	}
 
 	s.t.Cleanup(func() {
-		configuration.CloseAllServers()
+		configuration.ShutdownAllServers(context.Background())
 	})
 
 	return s, s, s
