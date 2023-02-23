@@ -17,6 +17,8 @@ import (
 const (
 	mediaTypeJSON = "application/json"
 	mediaTypeText = "text/plain"
+	mediaTypeXml  = "application/xml"
+	mediaTypeCsv  = "text/csv"
 )
 
 type pathMatcher interface {
@@ -121,9 +123,9 @@ func LoadInteraction(data []byte, alias string) (*Interaction, error) {
 			return interaction, nil
 		}
 		return nil, fmt.Errorf("media type is %s but body is not json", mediaType)
-	case mediaTypeText:
-		if plainTextRequestBody, ok := requestBody.(string); ok {
-			interaction.addTextConstraintsFromPact(propertiesWithMatchingRule, plainTextRequestBody)
+	case mediaTypeText, mediaTypeCsv, mediaTypeXml:
+		if body, ok := requestBody.(string); ok {
+			interaction.addTextConstraintsFromPact(propertiesWithMatchingRule, body)
 			return interaction, nil
 		}
 		return nil, fmt.Errorf("media type is %s but body is not text", mediaType)

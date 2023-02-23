@@ -11,9 +11,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/form3tech-oss/pact-proxy/internal/app/httpresponse"
 	"github.com/labstack/echo/v4"
 	log "github.com/sirupsen/logrus"
+
+	"github.com/form3tech-oss/pact-proxy/internal/app/httpresponse"
 )
 
 const (
@@ -36,6 +37,8 @@ type Config struct {
 var supportedMediaTypes = map[string]func([]byte, *url.URL) (requestDocument, error){
 	mediaTypeJSON: ParseJSONRequest,
 	mediaTypeText: ParsePlainTextRequest,
+	mediaTypeCsv:  ParsePlainTextRequest,
+	mediaTypeXml:  ParsePlainTextRequest,
 }
 
 type api struct {
@@ -247,9 +250,9 @@ func (a *api) interactionsWaitHandler(c echo.Context) error {
 
 func (a *api) indexHandler(c echo.Context) error {
 	req := c.Request()
-	log.Infof("proxying %s %s", req.Method, req.URL.Path)
+	log.Infof("proxying %s %s %+v", req.Method, req.URL.Path, req.Header)
 
-	mediaType, err := parseMediaTypeHeader(c.Request().Header)
+	mediaType, err := parseMediaTypeHeader(req.Header)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, httpresponse.Errorf("failed to parse Content-Type header. %s", err.Error()))
 	}
@@ -269,19 +272,19 @@ func (a *api) indexHandler(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, httpresponse.Errorf("unable to read requestDocument data. %s", err.Error()))
 	}
 
-	err = c.Request().Body.Close()
+	err = req.Body.Close()
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, httpresponse.Error(err.Error()))
 	}
 
-	c.Request().Body = io.NopCloser(bytes.NewBuffer(data))
+	req.Body = io.NopCloser(bytes.NewBuffer(data))
 
-	request, err := parseRequest(data, c.Request().URL)
+	request, err := parseRequest(data, req.URL)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, httpresponse.Errorf("unable to read requestDocument data. %s", err.Error()))
 	}
 	h := make(map[string]interface{})
-	for headerName, headerValues := range c.Request().Header {
+	for headerName, headerValues := range req.Header {
 		for _, headerValue := range headerValues {
 			h[headerName] = headerValue
 		}
