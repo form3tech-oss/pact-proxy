@@ -246,100 +246,152 @@ func TestModifiedBodyWithFirstAndLastName_ForNRequests(t *testing.T) {
 		the_nth_response_body_has_(3, "last_name", "any")
 }
 
-func TestTextPlainContentType(t *testing.T) {
-	given, when, then := NewProxyStage(t)
-
-	given.
-		a_pact_that_expects_plain_text()
-
-	when.
-		a_plain_text_request_is_sent()
-
-	then.
-		pact_verification_is_successful().and().
-		the_response_is_(http.StatusOK).and().
-		the_response_body_to_plain_text_request_is_correct()
+type nonJsonTestCase struct {
+	reqContentType  string
+	reqBody         string
+	respContentType string
+	respBody        string
 }
 
-func TestModifiedStatusCodeWithPlainTextBody(t *testing.T) {
-	given, when, then := NewProxyStage(t)
-
-	given.
-		a_pact_that_expects_plain_text().and().
-		a_modified_response_status_of_(http.StatusInternalServerError)
-
-	when.
-		a_plain_text_request_is_sent()
-
-	then.
-		pact_verification_is_successful().and().
-		the_response_is_(http.StatusInternalServerError).and().
-		the_response_body_to_plain_text_request_is_correct()
+func createNonJsonTestCases() map[string]nonJsonTestCase {
+	return map[string]nonJsonTestCase{
+		// text/plain
+		"text/plain request and text/plain response": {
+			reqContentType:  "text/plain",
+			reqBody:         "req text",
+			respContentType: "text/plain",
+			respBody:        "resp text",
+		},
+		"text/plain request and application/json response": {
+			reqContentType:  "text/plain",
+			reqBody:         "req text",
+			respContentType: "application/json",
+			respBody:        `{"status":"ok"}`,
+		},
+		// csv
+		"text/csv request and text/csv response": {
+			reqContentType:  "text/csv",
+			reqBody:         "firstname,lastname\nfoo,bar",
+			respContentType: "text/csv",
+			respBody:        "status,name\n200,ok",
+		},
+		"text/csv request and application/json response": {
+			reqContentType:  "text/csv",
+			reqBody:         "firstname,lastname\nfoo,bar",
+			respContentType: "application/json",
+			respBody:        `{"status":"ok"}`,
+		},
+		// xml
+		"application/xml request and text/csv response": {
+			reqContentType:  "application/xml",
+			reqBody:         "<root><firstname>foo</firstname></root>",
+			respContentType: "application/xml",
+			respBody:        "<root><status>200</status></root>",
+		},
+		"application/xml request and application/json response": {
+			reqContentType:  "application/xml",
+			reqBody:         "<root><firstname>foo</firstname></root>",
+			respContentType: "application/json",
+			respBody:        `{"status":"ok"}`,
+		},
+	}
 }
 
-func TestPlainTextConstraintMatches(t *testing.T) {
-	given, when, then := NewProxyStage(t)
+func TestNonJsonContentType(t *testing.T) {
+	for testName, tc := range createNonJsonTestCases() {
+		t.Run(testName, func(t *testing.T) {
+			given, when, then := NewProxyStage(t)
 
-	given.
-		a_pact_that_expects_plain_text()
+			given.
+				a_pact_that_expects(tc.reqContentType, tc.reqBody, tc.respContentType, tc.respBody)
 
-	when.
-		a_body_constraint_is_added("text").and().
-		a_plain_text_request_is_sent()
+			when.
+				a_request_is_sent_with(tc.reqContentType, tc.reqBody)
 
-	then.
-		pact_verification_is_successful().and().
-		the_response_is_(http.StatusOK).and().
-		the_response_body_to_plain_text_request_is_correct()
+			then.
+				pact_verification_is_successful().and().
+				the_response_is_(http.StatusOK).and().
+				the_response_body_is(tc.respBody)
+		})
+	}
+
 }
 
-func TestPlainTextDefaultConstraintAdded(t *testing.T) {
-	given, when, then := NewProxyStage(t)
+func TestNonJsonWithModifiedStatusCode(t *testing.T) {
+	for testName, tc := range createNonJsonTestCases() {
+		t.Run(testName, func(t *testing.T) {
+			given, when, then := NewProxyStage(t)
 
-	given.
-		a_pact_that_expects_plain_text()
+			given.
+				a_pact_that_expects(tc.reqContentType, tc.reqBody, tc.respContentType, tc.respBody).and().
+				a_modified_response_status_of_(http.StatusInternalServerError)
 
-	when.
-		a_plain_text_request_is_sent_with_body("request with doesn't match constraint")
+			when.
+				a_request_is_sent_with(tc.reqContentType, tc.reqBody)
 
-	then.
-		pact_verification_is_not_successful().and().
-		the_response_is_(http.StatusBadRequest)
+			then.
+				pact_verification_is_successful().and().
+				the_response_is_(http.StatusInternalServerError).and().
+				the_response_body_is(tc.respBody)
+		})
+	}
 }
 
-func TestPlainTextConstraintDoesNotMatch(t *testing.T) {
-	given, when, then := NewProxyStage(t)
+func TestNonJsonConstraintMatches(t *testing.T) {
+	for testName, tc := range createNonJsonTestCases() {
+		t.Run(testName, func(t *testing.T) {
+			given, when, then := NewProxyStage(t)
 
-	given.
-		a_pact_that_expects_plain_text()
+			given.
+				a_pact_that_expects(tc.reqContentType, tc.reqBody, tc.respContentType, tc.respBody)
 
-	when.
-		a_body_constraint_is_added("incorrect file content").and().
-		a_plain_text_request_is_sent()
+			when.
+				a_body_constraint_is_added(tc.reqBody).and().
+				a_request_is_sent_with(tc.reqContentType, tc.reqBody)
 
-	then.
-		pact_verification_is_not_successful().and().
-		the_response_is_(http.StatusBadRequest)
+			then.
+				pact_verification_is_successful().and().
+				the_response_is_(http.StatusOK).and().
+				the_response_body_is(tc.respBody)
+		})
+	}
 }
 
-func TestPlainTextDifferentRequestAndResponseBodies(t *testing.T) {
-	given, when, then := NewProxyStage(t)
+func TestNonJsonDefaultConstraintAdded(t *testing.T) {
+	for testName, tc := range createNonJsonTestCases() {
+		t.Run(testName, func(t *testing.T) {
+			given, when, then := NewProxyStage(t)
 
-	reqBody := "request body"
-	respBody := "response body"
-	requestConstraint := "request body"
+			given.
+				a_pact_that_expects(tc.reqContentType, tc.reqBody, tc.respContentType, tc.respBody)
 
-	given.
-		a_pact_that_expects_plain_text_with_request_response(reqBody, respBody)
+			when.
+				a_request_is_sent_with("text/plain", "request with doesn't match constraint")
 
-	when.
-		a_body_constraint_is_added(requestConstraint).and().
-		a_plain_text_request_is_sent_with_body("request body")
+			then.
+				pact_verification_is_not_successful().and().
+				the_response_is_(http.StatusBadRequest)
+		})
+	}
+}
 
-	then.
-		pact_verification_is_successful().and().
-		the_response_is_(http.StatusOK).and().
-		the_response_body_is([]byte(respBody))
+func TestNonJsonConstraintDoesNotMatch(t *testing.T) {
+	for testName, tc := range createNonJsonTestCases() {
+		t.Run(testName, func(t *testing.T) {
+			given, when, then := NewProxyStage(t)
+
+			given.
+				a_pact_that_expects(tc.reqContentType, tc.reqBody, tc.respContentType, tc.respBody)
+
+			when.
+				a_body_constraint_is_added("incorrect file content").and().
+				a_request_is_sent_with(tc.reqContentType, tc.reqBody)
+
+			then.
+				pact_verification_is_not_successful().and().
+				the_response_is_(http.StatusBadRequest)
+		})
+	}
 }
 
 func TestIncorrectContentTypes(t *testing.T) {

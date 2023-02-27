@@ -15,12 +15,13 @@ import (
 	"time"
 
 	"github.com/avast/retry-go/v4"
-	"github.com/form3tech-oss/pact-proxy/internal/app/configuration"
-	internal "github.com/form3tech-oss/pact-proxy/internal/app/pactproxy"
-	"github.com/form3tech-oss/pact-proxy/pkg/pactproxy"
 	"github.com/pact-foundation/pact-go/dsl"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/form3tech-oss/pact-proxy/internal/app/configuration"
+	internal "github.com/form3tech-oss/pact-proxy/internal/app/pactproxy"
+	"github.com/form3tech-oss/pact-proxy/pkg/pactproxy"
 )
 
 type ProxyStage struct {
@@ -224,24 +225,6 @@ func (s *ProxyStage) a_pact_that_expects_plain_text() *ProxyStage {
 	return s
 }
 
-func (s *ProxyStage) a_pact_that_expects_plain_text_with_request_response(req, resp string) *ProxyStage {
-	s.pact.
-		AddInteraction().
-		UponReceiving(s.pactName).
-		WithRequest(dsl.Request{
-			Method:  "POST",
-			Path:    dsl.String("/users"),
-			Headers: dsl.MapMatcher{"Content-Type": dsl.String("text/plain")},
-			Body:    req,
-		}).
-		WillRespondWith(dsl.Response{
-			Status:  200,
-			Headers: dsl.MapMatcher{"Content-Type": dsl.String("text/plain")},
-			Body:    resp,
-		})
-	return s
-}
-
 func (s *ProxyStage) a_pact_that_expects_plain_text_without_request_content_type_header() *ProxyStage {
 	s.pact.
 		AddInteraction().
@@ -286,14 +269,6 @@ func (s *ProxyStage) a_modified_response_body_of_(path string, value interface{}
 
 func (s *ProxyStage) a_modified_response_attempt_of(i int) {
 	s.modifiedAttempt = &i
-}
-
-func (s *ProxyStage) a_plain_text_request_is_sent() {
-	s.a_plain_text_request_is_sent_with_body("text")
-}
-
-func (s *ProxyStage) a_plain_text_request_is_sent_with_body(body string) {
-	s.n_requests_are_sent_using_the_body_and_content_type(1, body, "text/plain")
 }
 
 func (s *ProxyStage) a_request_is_sent_using_the_name(name string) {
@@ -451,8 +426,8 @@ func (s *ProxyStage) the_nth_response_body_has_(n int, key, value string) *Proxy
 	return s
 }
 
-func (s *ProxyStage) the_response_body_is(data []byte) *ProxyStage {
-	return s.the_nth_response_body_is(1, data)
+func (s *ProxyStage) the_response_body_is(data string) *ProxyStage {
+	return s.the_nth_response_body_is(1, []byte(data))
 }
 
 func (s *ProxyStage) the_response_body_to_plain_text_request_is_correct() *ProxyStage {
@@ -538,4 +513,26 @@ func (s *ProxyStage) the_proxy_returns_details_of_all_requests() {
 		s.assert.NoError(err)
 		s.assert.Equal(name, body.Name)
 	}
+}
+
+func (s *ProxyStage) a_pact_that_expects(reqContentType, reqBody, respContentType, respBody string) *ProxyStage {
+	s.pact.
+		AddInteraction().
+		UponReceiving(s.pactName).
+		WithRequest(dsl.Request{
+			Method:  "POST",
+			Path:    dsl.String("/users"),
+			Headers: dsl.MapMatcher{"Content-Type": dsl.String(reqContentType)},
+			Body:    reqBody,
+		}).
+		WillRespondWith(dsl.Response{
+			Status:  200,
+			Headers: dsl.MapMatcher{"Content-Type": dsl.String(respContentType)},
+			Body:    respBody,
+		})
+	return s
+}
+
+func (s *ProxyStage) a_request_is_sent_with(contentType, body string) {
+	s.n_requests_are_sent_using_the_body_and_content_type(1, body, contentType)
 }
