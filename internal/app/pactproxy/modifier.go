@@ -1,6 +1,7 @@
 package pactproxy
 
 import (
+	"encoding/base64"
 	"fmt"
 	"strconv"
 	"strings"
@@ -43,6 +44,15 @@ func (ims *interactionModifiers) Modifiers() []*interactionModifier {
 func (ims *interactionModifiers) modifyBody(b []byte) ([]byte, error) {
 	for _, m := range ims.Modifiers() {
 		requestCount := ims.interaction.getRequestCount()
+		if m.Path == "$.bytes.body" {
+			if v, ok := m.Value.(string); ok && m.Attempt == nil || *m.Attempt == requestCount {
+				var err error
+				if b, err = base64.StdEncoding.DecodeString(v); err != nil {
+					return nil, err
+				}
+			}
+		}
+
 		if strings.HasPrefix(m.Path, "$.body.") {
 			if m.Attempt == nil || *m.Attempt == requestCount {
 				var err error
