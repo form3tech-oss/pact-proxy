@@ -337,6 +337,25 @@ func TestNonJsonWithModifiedStatusCode(t *testing.T) {
 	}
 }
 
+func TestNonJsonWithModifiedResponseBody(t *testing.T) {
+	for testName, tc := range createNonJsonTestCases() {
+		t.Run(testName, func(t *testing.T) {
+			given, when, then := NewProxyStage(t)
+
+			given.
+				a_pact_that_expects(tc.reqContentType, tc.reqBody, tc.respContentType, tc.respBody).and().
+				a_modified_response_body_of_("$.bytes.body", []byte("newbody"))
+
+			when.
+				a_request_is_sent_with(tc.reqContentType, tc.reqBody)
+
+			then.
+				pact_verification_is_successful().and().
+				the_response_body_is("newbody")
+		})
+	}
+}
+
 func TestNonJsonConstraintMatches(t *testing.T) {
 	for testName, tc := range createNonJsonTestCases() {
 		t.Run(testName, func(t *testing.T) {

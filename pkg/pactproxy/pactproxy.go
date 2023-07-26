@@ -65,11 +65,14 @@ func (p *PactProxy) addModifier(interaction, path string, value interface{}, att
 	if attempt != nil {
 		body["attempt"] = attempt
 	}
-	b, _ := json.Marshal(body)
+	b, err := json.Marshal(body)
+	if err != nil {
+		panic(err)
+	}
 
 	r, _ := http.NewRequest("POST", strings.TrimSuffix(p.url, "/")+"/interactions/modifiers", bytes.NewBuffer(b))
 	r.Header.Set("Content-Type", "application/json")
-	_, err := p.client.Do(r)
+	_, err = p.client.Do(r)
 	if err != nil {
 		panic(err)
 	}
