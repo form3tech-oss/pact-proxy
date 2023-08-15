@@ -122,6 +122,13 @@ func LoadInteraction(data []byte, alias string) (*Interaction, error) {
 			interaction.addJSONConstraintsFromPact("$.body", propertiesWithMatchingRule, jsonRequestBody)
 			return interaction, nil
 		}
+
+		if _, ok := requestBody.([]interface{}); ok {
+			// An array request body should be accepted for application/json media type.
+			// However, no constraint is added for it
+			return interaction, nil
+		}
+
 		return nil, fmt.Errorf("media type is %s but body is not json", mediaType)
 	case mediaTypeText, mediaTypeCsv, mediaTypeXml:
 		if body, ok := requestBody.(string); ok {
@@ -284,7 +291,7 @@ func (i *Interaction) addJSONConstraintsFromPact(path string, matchingRules map[
 	}
 }
 
-// This function adds constraints for the entire plain text request body if
+// This function adds a constraint for the entire plain text request body if
 // it doesn't have a corresponding matching rule
 func (i *Interaction) addTextConstraintsFromPact(matchingRules map[string]bool, constraint string) {
 	if _, present := matchingRules["$.body"]; !present {
@@ -295,6 +302,7 @@ func (i *Interaction) addTextConstraintsFromPact(matchingRules map[string]bool, 
 		})
 	}
 }
+
 func (i *Interaction) Match(path, method string) bool {
 	return method == i.Method && i.pathMatcher.match(path)
 }
@@ -326,7 +334,7 @@ func (i *Interaction) loadValuesFromSource(constraint interactionConstraint, int
 	return values, nil
 }
 
-func (i *Interaction) EvaluateConstrains(request requestDocument, interactions *Interactions) (bool, []string) {
+func (i *Interaction) EvaluateConstraints(request requestDocument, interactions *Interactions) (bool, []string) {
 	result := true
 	violations := make([]string, 0)
 
@@ -350,7 +358,7 @@ func (i *Interaction) EvaluateConstrains(request requestDocument, interactions *
 			log.Warn(err)
 		}
 		if reflect.TypeOf(val) == reflect.TypeOf([]interface{}{}) {
-			log.Infof("skipping matching on interface{} type for path '%s'", constraint.Path)
+			log.Infof("skipping matching on []interface{} type for path '%s'", constraint.Path)
 			continue
 		}
 		if err == nil {

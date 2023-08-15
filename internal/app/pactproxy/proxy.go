@@ -294,7 +294,7 @@ func (a *api) indexHandler(c echo.Context) error {
 	unmatched := make(map[string][]string)
 	matched := make([]*Interaction, 0)
 	for _, interaction := range allInteractions {
-		ok, info := interaction.EvaluateConstrains(request, a.interactions)
+		ok, info := interaction.EvaluateConstraints(request, a.interactions)
 		if ok {
 			interaction.StoreRequest(request)
 			matched = append(matched, interaction)

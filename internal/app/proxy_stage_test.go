@@ -43,6 +43,8 @@ type ProxyStage struct {
 	modifiedAttempt       *int
 	modifiedBody          map[string]interface{}
 	interactionDetail     *pactproxy.Interaction
+
+	additionalConstraints map[string]string
 }
 
 var largeString = strings.Repeat("long_string123BBmmF8BYezrBhCROOCRJfeH5k69hMKXH77TSvwF5GHUZFnbh1dsZ3d90HeR0jUIOovJJVS508uI17djeLFFSb7", 440)
@@ -71,6 +73,8 @@ func NewProxyStageWithConfig(t *testing.T, config ProxyConfig) (*ProxyStage, *Pr
 		modifiedBody: make(map[string]interface{}),
 		pactName:     "pact-" + strconv.FormatInt(time.Now().UnixMilli(), 10),
 		config:       config,
+
+		additionalConstraints: map[string]string{},
 	}
 
 	s.t.Cleanup(func() {
@@ -257,6 +261,11 @@ func (s *ProxyStage) a_body_constraint_is_added(name string) *ProxyStage {
 	return s
 }
 
+func (s *ProxyStage) an_additional_constraint_is_added(path, value string) *ProxyStage {
+	s.additionalConstraints[path] = value
+	return s
+}
+
 func (s *ProxyStage) a_modified_response_status_of_(statusCode int) *ProxyStage {
 	s.modifiedStatusCode = statusCode
 	return s
@@ -302,6 +311,10 @@ func (s *ProxyStage) n_requests_are_sent_using_the_body_and_content_type(n int, 
 
 		if s.bodyConstraintValue != "" {
 			i.AddConstraint("$.body", s.bodyConstraintValue)
+		}
+
+		for path, value := range s.additionalConstraints {
+			i.AddConstraint(path, value)
 		}
 
 		if s.modifiedStatusCode != 0 {
@@ -515,7 +528,7 @@ func (s *ProxyStage) the_proxy_returns_details_of_all_requests() {
 	}
 }
 
-func (s *ProxyStage) a_pact_that_expects(reqContentType, reqBody, respContentType, respBody string) *ProxyStage {
+func (s *ProxyStage) a_pact_that_expects(reqContentType string, reqBody interface{}, respContentType string, respBody string) *ProxyStage {
 	s.pact.
 		AddInteraction().
 		UponReceiving(s.pactName).
