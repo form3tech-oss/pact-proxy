@@ -254,6 +254,140 @@ func TestV3MatchingRulesLeadToCorrectConstraints(t *testing.T) {
 	}
 }
 
+func TestLoadArrayRequestBodyInteractions(t *testing.T) {
+	arrayOfStrings := `{
+		"description": "A request to create an address",
+		"request": {
+		  "method": "POST",
+		  "path": "/addresses",
+		  "headers": {
+			"Content-Type": "application/json"
+		  },
+		  "body": ["a", "b", "c"]
+		},
+		"response": {
+		  "status": 200,
+		  "headers": {
+			"Content-Type": "application/json"
+		  },
+		  "body": ["a", "b", "c"]
+		}
+	  }`
+	arrayOfInts := `{
+		"description": "A request to create an address",
+		"request": {
+			"method": "POST",
+			"path": "/addresses",
+			"headers": {
+			"Content-Type": "application/json"
+			},
+			"body": [1, 2, 3]
+		},
+		"response": {
+			"status": 200,
+			"headers": {
+			"Content-Type": "application/json"
+			},
+			"body": [1, 2, 3]
+		}
+		}`
+	arrayOfBools := `{
+			"description": "A request to create an address",
+			"request": {
+				"method": "POST",
+				"path": "/addresses",
+				"headers": {
+				"Content-Type": "application/json"
+				},
+				"body": [true, false, true]
+			},
+			"response": {
+				"status": 200,
+				"headers": {
+				"Content-Type": "application/json"
+				},
+				"body": [true, false, true]
+			}
+			}`
+	arrayOfObjects := `{
+			"description": "A request to create an address",
+			"request": {
+				"method": "POST",
+				"path": "/addresses",
+				"headers": {
+				"Content-Type": "application/json"
+				},
+				"body": [ {"key": "val"}, {"key": "val"} ]
+			},
+			"response": {
+				"status": 200,
+				"headers": {
+				"Content-Type": "application/json"
+				},
+				"body": [ {"key": "val"}, {"key": "val"} ]
+			}
+			}`
+	arrayOfStringsWithMatcher :=
+		`{
+		"description": "A request to create an address",
+		"request": {
+		  "method": "POST",
+		  "path": "/addresses",
+			"headers": {
+			"Content-Type": "application/json"
+		  },
+		  "body": ["a", "b", "c"],
+		  "matchingRules": {
+				"$.body": {
+					"match": "type"
+				}
+			}
+		},
+		"response": {
+		  "status": 200,
+		  "headers": {
+			"Content-Type": "application/json"
+			},
+			"body": ["a", "b", "c"]
+		}
+	  }`
+
+	tests := []struct {
+		name        string
+		interaction []byte
+	}{
+		{
+			name:        "array of strings",
+			interaction: []byte(arrayOfStrings),
+		},
+		{
+			name:        "array of ints",
+			interaction: []byte(arrayOfInts),
+		},
+		{
+			name:        "array of bools",
+			interaction: []byte(arrayOfBools),
+		},
+		{
+			name:        "array of objects",
+			interaction: []byte(arrayOfObjects),
+		},
+		{
+			name:        "array of strings with matcher",
+			interaction: []byte(arrayOfStringsWithMatcher),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			interaction, err := LoadInteraction(tt.interaction, "alias")
+			require.NoError(t, err, "unexpected error %v", err)
+
+			require.Empty(t, interaction.constraints, "No constraint should be added for the interaction")
+		})
+	}
+}
+
 func Test_parseMediaType(t *testing.T) {
 	tests := []struct {
 		name    string

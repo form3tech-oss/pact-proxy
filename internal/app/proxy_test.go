@@ -465,3 +465,175 @@ func TestGetInteractionDetailsAndHistory(t *testing.T) {
 		the_proxy_waits_for_all_requests().and().
 		the_proxy_returns_details_of_all_requests()
 }
+
+type arrayRequestBodyTestCase struct {
+	reqBody         []interface{}
+	respContentType string
+	respBody        string
+
+	matchedReqBody   string
+	unmatchedReqBody string
+
+	matchedConstraintPath    string
+	matchedConstraintValue   string
+	unmatchedConstraintPath  string
+	unmatchedConstraintValue string
+}
+
+func createArrayRequestBodyTestCases() map[string]arrayRequestBodyTestCase {
+	return map[string]arrayRequestBodyTestCase{
+		"array of integers": {
+			reqBody:         []interface{}{0, 1, 2},
+			respContentType: "application/json",
+			respBody:        `[1]`,
+
+			matchedReqBody:   `[0, 1, 2]`,
+			unmatchedReqBody: `[1, 2]`,
+
+			matchedConstraintPath:    "$.body[0]",
+			matchedConstraintValue:   "0",
+			unmatchedConstraintPath:  "$.body[1]",
+			unmatchedConstraintValue: "2",
+		},
+		"array of strings": {
+			reqBody:         []interface{}{"a", "b", "c"},
+			respContentType: "application/json",
+			respBody:        `["ok"]`,
+
+			matchedReqBody:   `["a", "b", "c"]`,
+			unmatchedReqBody: `["a", "b", "c", "d"]`,
+
+			matchedConstraintPath:    "$.body[0]",
+			matchedConstraintValue:   "a",
+			unmatchedConstraintPath:  "$.body[1]",
+			unmatchedConstraintValue: "c",
+		},
+		"array of bools": {
+			reqBody:         []interface{}{true, false, true},
+			respContentType: "application/json",
+			respBody:        `[true]`,
+
+			matchedReqBody:   `[true, false, true]`,
+			unmatchedReqBody: `[true, true, true]`,
+
+			matchedConstraintPath:    "$.body[0]",
+			matchedConstraintValue:   "true",
+			unmatchedConstraintPath:  "$.body[1]",
+			unmatchedConstraintValue: "true",
+		},
+		"array of objects": {
+			reqBody: []interface{}{
+				map[string]string{"key": "val"},
+				map[string]string{"key": "val"},
+			},
+			respContentType: "application/json",
+			respBody:        `[{"status":"ok"}]`,
+
+			matchedReqBody:   `[ {"key": "val"}, {"key": "val"} ]`,
+			unmatchedReqBody: `[ {"key": "val"}, {"key": "unexpected value"} ]`,
+
+			matchedConstraintPath:    "$.body[0].key",
+			matchedConstraintValue:   "val",
+			unmatchedConstraintPath:  "$.body[1].key",
+			unmatchedConstraintValue: "wrong value",
+		},
+	}
+}
+
+func TestArrayBodyRequest(t *testing.T) {
+	for testName, tc := range createArrayRequestBodyTestCases() {
+		t.Run(testName, func(t *testing.T) {
+			given, when, then := NewProxyStage(t)
+
+			given.
+				a_pact_that_expects("application/json", tc.reqBody, tc.respContentType, tc.respBody)
+
+			when.
+				a_request_is_sent_with("application/json", tc.matchedReqBody)
+
+			then.
+				pact_verification_is_successful().and().
+				the_response_is_(http.StatusOK).and().
+				the_response_body_is(tc.respBody)
+		})
+	}
+
+}
+
+func TestArrayBodyRequestWithModifiedStatusCode(t *testing.T) {
+	for testName, tc := range createArrayRequestBodyTestCases() {
+		t.Run(testName, func(t *testing.T) {
+			given, when, then := NewProxyStage(t)
+
+			given.
+				a_pact_that_expects("application/json", tc.reqBody, tc.respContentType, tc.respBody).and().
+				a_modified_response_status_of_(http.StatusInternalServerError)
+
+			when.
+				a_request_is_sent_with("application/json", tc.matchedReqBody)
+
+			then.
+				pact_verification_is_successful().and().
+				the_response_is_(http.StatusInternalServerError).and().
+				the_response_body_is(tc.respBody)
+		})
+	}
+}
+
+func TestArrayBodyRequestUnmatchedRequestBody(t *testing.T) {
+	for testName, tc := range createArrayRequestBodyTestCases() {
+		t.Run(testName, func(t *testing.T) {
+			given, when, then := NewProxyStage(t)
+
+			given.
+				a_pact_that_expects("application/json", tc.reqBody, tc.respContentType, tc.respBody)
+
+			when.
+				a_request_is_sent_with("application/json", tc.unmatchedReqBody)
+
+			then.
+				// Pact Mock Server returns 500 if request body does not match,
+				// so the response status code is not checked
+				pact_verification_is_not_successful()
+		})
+	}
+}
+
+func TestArrayBodyRequestConstraintMatches(t *testing.T) {
+	for testName, tc := range createArrayRequestBodyTestCases() {
+		t.Run(testName, func(t *testing.T) {
+			given, when, then := NewProxyStage(t)
+
+			given.
+				a_pact_that_expects("application/json", tc.reqBody, tc.respContentType, tc.respBody)
+
+			when.
+				an_additional_constraint_is_added(tc.matchedConstraintPath, tc.matchedConstraintValue).and().
+				a_request_is_sent_with("application/json", tc.matchedReqBody)
+
+			then.
+				pact_verification_is_successful().and().
+				the_response_is_(http.StatusOK).and().
+				the_response_body_is(tc.respBody)
+		})
+	}
+}
+
+func TestArrayBodyRequestConstraintDoesNotMatch(t *testing.T) {
+	for testName, tc := range createArrayRequestBodyTestCases() {
+		t.Run(testName, func(t *testing.T) {
+			given, when, then := NewProxyStage(t)
+
+			given.
+				a_pact_that_expects("application/json", tc.reqBody, tc.respContentType, tc.respBody)
+
+			when.
+				an_additional_constraint_is_added(tc.unmatchedConstraintPath, tc.unmatchedConstraintValue).and().
+				a_request_is_sent_with("application/json", tc.matchedReqBody)
+
+			then.
+				pact_verification_is_not_successful().and().
+				the_response_is_(http.StatusBadRequest)
+		})
+	}
+}

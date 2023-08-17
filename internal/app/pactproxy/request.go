@@ -11,14 +11,27 @@ import (
 type requestDocument map[string]interface{}
 
 func ParseJSONRequest(data []byte, url *url.URL) (requestDocument, error) {
+	queryValues := parseQueryValues(url)
+
 	body := make(map[string]interface{})
 	if len(data) > 0 {
 		err := json.Unmarshal(data, &body)
+
 		if err != nil {
-			return nil, errors.Wrap(err, "unable to parse RequestDocument body")
+			// The request body may be an array
+			var arrayBody []interface{}
+			err = json.Unmarshal(data, &arrayBody)
+			if err != nil {
+				return nil, errors.Wrap(err, "unable to parse RequestDocument body")
+			}
+
+			return map[string]interface{}{
+				"path":  url.Path,
+				"body":  arrayBody,
+				"query": queryValues,
+			}, nil
 		}
 	}
-	queryValues := parseQueryValues(url)
 
 	return map[string]interface{}{
 		"path":  url.Path,
