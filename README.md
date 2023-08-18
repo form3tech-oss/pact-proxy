@@ -132,6 +132,12 @@ value:             jim.brown
 attempt:           2
 ````
 
+## Array Indices in Path Specifiers
+If the path affected by a constraint or modification involves an array, use dot syntax to access the array index, e.g.:
+
+`$.body.path.to.array.0.property`
+
+**NOT** `$.body.path.to.array.[0].property`
 
 ## What other operations are supported?
 
