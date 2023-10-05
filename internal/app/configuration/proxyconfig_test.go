@@ -183,43 +183,41 @@ func TestConfigureProxy_MTLS(t *testing.T) {
 	}
 }
 
-func TestProxyConfig_RejectUnrecognizedInteractions(t *testing.T) {
+func TestProxyConfig_ForwardUnrecognisedRequests(t *testing.T) {
 	os.Clearenv()
-	expectedDefaultValue := true
-
 	config, err := NewFromEnv()
 	require.NoError(t, err)
-	require.Equal(t, expectedDefaultValue, config.RejectUnrecognizedInteractions) // If no env var is specified it should default to true
+	require.Equal(t, false, config.ForwardUnrecognisedRequests) // If no env var is specified it should default to false
 
-	os.Setenv("REJECT_UNRECOGNIZED_INTERACTIONS", "false")
+	os.Setenv("FORWARD_UNRECOGNIZED_REQUESTS", "false")
 	config, err = NewFromEnv()
 	require.NoError(t, err)
-	require.Equal(t, false, config.RejectUnrecognizedInteractions)
+	require.Equal(t, false, config.ForwardUnrecognisedRequests)
 
-	os.Setenv("REJECT_UNRECOGNIZED_INTERACTIONS", "true")
+	os.Setenv("FORWARD_UNRECOGNIZED_REQUESTS", "true")
 	config, err = NewFromEnv()
 	require.NoError(t, err)
-	require.Equal(t, true, config.RejectUnrecognizedInteractions)
+	require.Equal(t, true, config.ForwardUnrecognisedRequests)
 
-	os.Setenv("REJECT_UNRECOGNIZED_INTERACTIONS", "not a boolean")
+	os.Setenv("FORWARD_UNRECOGNIZED_REQUESTS", "not a boolean")
 	config, err = NewFromEnv()
 	require.Error(t, err) // Parse error
 
-	os.Setenv("REJECT_UNRECOGNIZED_INTERACTIONS", "0")
+	os.Setenv("FORWARD_UNRECOGNIZED_REQUESTS", "0")
 	config, err = NewFromEnv()
 	require.NoError(t, err)
-	require.Equal(t, false, config.RejectUnrecognizedInteractions)
+	require.Equal(t, false, config.ForwardUnrecognisedRequests)
 
-	os.Setenv("REJECT_UNRECOGNIZED_INTERACTIONS", "1")
+	os.Setenv("FORWARD_UNRECOGNIZED_REQUESTS", "1")
 	config, err = NewFromEnv()
 	require.NoError(t, err)
-	require.Equal(t, true, config.RejectUnrecognizedInteractions)
+	require.Equal(t, true, config.ForwardUnrecognisedRequests)
 
-	os.Setenv("REJECT_UNRECOGNIZED_INTERACTIONS", "2")
+	os.Setenv("FORWARD_UNRECOGNIZED_REQUESTS", "2")
 	config, err = NewFromEnv()
 	require.Error(t, err) // Parse error
 
-	os.Setenv("REJECT_UNRECOGNIZED_INTERACTIONS", "-1")
+	os.Setenv("FORWARD_UNRECOGNIZED_REQUESTS", "-1")
 	config, err = NewFromEnv()
 	require.Error(t, err) // Parse error
 }
