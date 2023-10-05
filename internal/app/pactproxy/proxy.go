@@ -269,10 +269,9 @@ func (a *api) indexHandler(c echo.Context) error {
 	if !ok {
 		if a.rejectUnrecognizedInteractions {
 			return c.JSON(http.StatusBadRequest, httpresponse.Errorf("unable to find interaction to Match '%s %s'", req.Method, req.URL.Path))
-		} else {
-			// No interactions found, pass the request as is to pact mock server.
-			return a.ProxyRequest(c)
 		}
+		// No interactions found, pass the request as is to pact mock server.
+		return a.ProxyRequest(c)
 	}
 
 	data, err := io.ReadAll(req.Body)
