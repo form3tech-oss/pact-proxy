@@ -13,6 +13,9 @@ func NewFromEnv() (pactproxy.Config, error) {
 	ctx := context.Background()
 
 	var config pactproxy.Config
+
+	config.RejectUnrecognizedInteractions = true
+
 	err := envconfig.Process(ctx, &config)
 	if err != nil {
 		return config, errors.Wrap(err, "process env config")

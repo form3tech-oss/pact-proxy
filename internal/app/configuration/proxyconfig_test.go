@@ -183,6 +183,47 @@ func TestConfigureProxy_MTLS(t *testing.T) {
 	}
 }
 
+func TestProxyConfig_RejectUnrecognizedInteractions(t *testing.T) {
+	os.Clearenv()
+	expectedDefaultValue := true
+
+	config, err := NewFromEnv()
+	require.NoError(t, err)
+	require.Equal(t, expectedDefaultValue, config.RejectUnrecognizedInteractions) // If no env var is specified it should default to true
+
+	os.Setenv("REJECT_UNRECOGNIZED_INTERACTIONS", "false")
+	config, err = NewFromEnv()
+	require.NoError(t, err)
+	require.Equal(t, false, config.RejectUnrecognizedInteractions)
+
+	os.Setenv("REJECT_UNRECOGNIZED_INTERACTIONS", "true")
+	config, err = NewFromEnv()
+	require.NoError(t, err)
+	require.Equal(t, true, config.RejectUnrecognizedInteractions)
+
+	os.Setenv("REJECT_UNRECOGNIZED_INTERACTIONS", "not a boolean")
+	config, err = NewFromEnv()
+	require.Error(t, err) // Parse error
+
+	os.Setenv("REJECT_UNRECOGNIZED_INTERACTIONS", "0")
+	config, err = NewFromEnv()
+	require.NoError(t, err)
+	require.Equal(t, false, config.RejectUnrecognizedInteractions)
+
+	os.Setenv("REJECT_UNRECOGNIZED_INTERACTIONS", "1")
+	config, err = NewFromEnv()
+	require.NoError(t, err)
+	require.Equal(t, true, config.RejectUnrecognizedInteractions)
+
+	os.Setenv("REJECT_UNRECOGNIZED_INTERACTIONS", "2")
+	config, err = NewFromEnv()
+	require.Error(t, err) // Parse error
+
+	os.Setenv("REJECT_UNRECOGNIZED_INTERACTIONS", "-1")
+	config, err = NewFromEnv()
+	require.Error(t, err) // Parse error
+}
+
 // gets a free port on the localhost and returns it as a url.
 func getFreePortURL() (*url.URL, error) {
 	port, err := utils.GetFreePort()
