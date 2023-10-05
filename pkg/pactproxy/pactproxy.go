@@ -14,6 +14,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+var InteractionNotFoundError = errors.New("interaction not found")
+
 type PactProxy struct {
 	client http.Client
 	url    string
@@ -144,6 +146,9 @@ func (p *PactProxy) ReadInteractionDetails(alias string) (*Interaction, error) {
 		return nil, errors.Wrap(err, "http get")
 	}
 	if res.StatusCode != http.StatusOK {
+		if res.StatusCode == http.StatusNotFound {
+			return nil, InteractionNotFoundError
+		}
 		return nil, errors.New("fail")
 	}
 	interaction := &Interaction{}
