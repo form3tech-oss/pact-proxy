@@ -183,6 +183,45 @@ func TestConfigureProxy_MTLS(t *testing.T) {
 	}
 }
 
+func TestProxyConfig_ForwardUnrecognisedRequests(t *testing.T) {
+	os.Clearenv()
+	config, err := NewFromEnv()
+	require.NoError(t, err)
+	require.Equal(t, false, config.ForwardUnrecognisedRequests) // If no env var is specified it should default to false
+
+	os.Setenv("FORWARD_UNRECOGNIZED_REQUESTS", "false")
+	config, err = NewFromEnv()
+	require.NoError(t, err)
+	require.Equal(t, false, config.ForwardUnrecognisedRequests)
+
+	os.Setenv("FORWARD_UNRECOGNIZED_REQUESTS", "true")
+	config, err = NewFromEnv()
+	require.NoError(t, err)
+	require.Equal(t, true, config.ForwardUnrecognisedRequests)
+
+	os.Setenv("FORWARD_UNRECOGNIZED_REQUESTS", "not a boolean")
+	config, err = NewFromEnv()
+	require.Error(t, err) // Parse error
+
+	os.Setenv("FORWARD_UNRECOGNIZED_REQUESTS", "0")
+	config, err = NewFromEnv()
+	require.NoError(t, err)
+	require.Equal(t, false, config.ForwardUnrecognisedRequests)
+
+	os.Setenv("FORWARD_UNRECOGNIZED_REQUESTS", "1")
+	config, err = NewFromEnv()
+	require.NoError(t, err)
+	require.Equal(t, true, config.ForwardUnrecognisedRequests)
+
+	os.Setenv("FORWARD_UNRECOGNIZED_REQUESTS", "2")
+	config, err = NewFromEnv()
+	require.Error(t, err) // Parse error
+
+	os.Setenv("FORWARD_UNRECOGNIZED_REQUESTS", "-1")
+	config, err = NewFromEnv()
+	require.Error(t, err) // Parse error
+}
+
 // gets a free port on the localhost and returns it as a url.
 func getFreePortURL() (*url.URL, error) {
 	port, err := utils.GetFreePort()
