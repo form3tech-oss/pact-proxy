@@ -23,15 +23,16 @@ const (
 )
 
 type Config struct {
-	ServerAddress url.URL       `env:"SERVER_ADDRESS"`      // Address to listen on
-	Proxies       []url.URL     `env:"PROXIES,delimiter=;"` // List of URL to serve pact-proxy on, e.g. http://localhost:8080;http://localhost:8081
-	WaitDelay     time.Duration `env:"WAIT_DELAY"`          // Default Delay for WaitForInteractions endpoint
-	WaitDuration  time.Duration `env:"WAIT_DURATION"`       // Default Duration for WaitForInteractions endpoint
-	RecordHistory bool          `env:"RECORD_HISTORY"`
-	TLSCAFile     string        `env:"TLS_CA_FILE"`
-	TLSCertFile   string        `env:"TLS_CERT_FILE"`
-	TLSKeyFile    string        `env:"TLS_KEY_FILE"`
-	Target        url.URL       // Do not load Target from env, we set this for each value from Proxies
+	ServerAddress               url.URL       `env:"SERVER_ADDRESS"`      // Address to listen on
+	Proxies                     []url.URL     `env:"PROXIES,delimiter=;"` // List of URL to serve pact-proxy on, e.g. http://localhost:8080;http://localhost:8081
+	WaitDelay                   time.Duration `env:"WAIT_DELAY"`          // Default Delay for WaitForInteractions endpoint
+	WaitDuration                time.Duration `env:"WAIT_DURATION"`       // Default Duration for WaitForInteractions endpoint
+	RecordHistory               bool          `env:"RECORD_HISTORY"`
+	ForwardUnrecognisedRequests bool          `env:"FORWARD_UNRECOGNIZED_REQUESTS,overwrite"` // Forwards requests that dont map to a registered interaction
+	TLSCAFile                   string        `env:"TLS_CA_FILE"`
+	TLSCertFile                 string        `env:"TLS_CERT_FILE"`
+	TLSKeyFile                  string        `env:"TLS_KEY_FILE"`
+	Target                      url.URL       // Do not load Target from env, we set this for each value from Proxies
 }
 
 var supportedMediaTypes = map[string]func([]byte, *url.URL) (requestDocument, error){
@@ -50,6 +51,7 @@ type api struct {
 	duration      time.Duration
 	recordHistory bool
 	echo.Context
+	forwardUnrecognisedRequests bool
 }
 
 func (a *api) ProxyRequest(c echo.Context) error {
@@ -60,13 +62,14 @@ func (a *api) ProxyRequest(c echo.Context) error {
 func SetupRoutes(e *echo.Echo, config *Config) {
 	// Create these once at startup, thay are shared by all server threads
 	a := api{
-		target:        &config.Target,
-		proxy:         httputil.NewSingleHostReverseProxy(&config.Target),
-		interactions:  &Interactions{},
-		notify:        NewNotify(),
-		delay:         config.WaitDelay,
-		duration:      config.WaitDuration,
-		recordHistory: config.RecordHistory,
+		target:                      &config.Target,
+		proxy:                       httputil.NewSingleHostReverseProxy(&config.Target),
+		interactions:                &Interactions{},
+		notify:                      NewNotify(),
+		delay:                       config.WaitDelay,
+		duration:                    config.WaitDuration,
+		recordHistory:               config.RecordHistory,
+		forwardUnrecognisedRequests: config.ForwardUnrecognisedRequests,
 	}
 	if a.delay == 0 {
 		a.delay = defaultDelay
@@ -264,6 +267,10 @@ func (a *api) indexHandler(c echo.Context) error {
 
 	allInteractions, ok := a.interactions.FindAll(req.URL.Path, req.Method)
 	if !ok {
+		if a.forwardUnrecognisedRequests {
+			// No interactions found, pass the request as is to pact mock server.
+			return a.ProxyRequest(c)
+		}
 		return c.JSON(http.StatusBadRequest, httpresponse.Errorf("unable to find interaction to Match '%s %s'", req.Method, req.URL.Path))
 	}
 
