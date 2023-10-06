@@ -171,6 +171,9 @@ func (s InteractionSetup) AddConstraint(path, value string) InteractionSetup {
 	return s
 }
 
+// AddModifier modifies the interaction's response on the specified attempt.
+// Attempts start and index 1, and consider the count of _all_ executions since the interaction was registered, not
+// since the modification was added.
 func (s InteractionSetup) AddModifier(path string, value interface{}, attempt *int) InteractionSetup {
 	s.pactProxy.addModifier(s.interaction, path, value, attempt)
 	return s
