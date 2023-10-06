@@ -135,7 +135,7 @@ func TestInteractionsGetHandler(t *testing.T) {
 		{
 			name:         "interaction not found",
 			interactions: &Interactions{},
-			code:         http.StatusBadRequest,
+			code:         http.StatusNotFound,
 			body:         `{"error_message":"interaction \"test\" not found"}`,
 		},
 	} {

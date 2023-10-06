@@ -187,7 +187,7 @@ func (a *api) interactionsGetHandler(c echo.Context) error {
 	alias := c.Param("alias")
 	interaction, found := a.interactions.Load(alias)
 	if !found {
-		return c.JSON(http.StatusBadRequest, httpresponse.Errorf("interaction %q not found", alias))
+		return c.JSON(http.StatusNotFound, httpresponse.Errorf("interaction %q not found", alias))
 	}
 
 	return c.JSON(http.StatusOK, interaction)
