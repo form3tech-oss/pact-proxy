@@ -10,11 +10,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/form3tech-oss/pact-proxy/internal/app/configuration"
-	"github.com/form3tech-oss/pact-proxy/pkg/pactproxy"
 	"github.com/pact-foundation/pact-go/dsl"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/form3tech-oss/pact-proxy/internal/app/configuration"
+	"github.com/form3tech-oss/pact-proxy/pkg/pactproxy"
 )
 
 const (
@@ -256,6 +257,26 @@ func (s *ConcurrentProxyStage) the_second_user_response_should_have_the_right_st
 	return s
 }
 
+func (s *ConcurrentProxyStage) all_responses_should_have_the_expected_return_values() *ConcurrentProxyStage {
+	statuses := make(map[int]int)
+	bodies := make(map[string]int)
+	for _, res := range s.userResponses {
+		statuses[res.StatusCode] += 1
+		bd, err := io.ReadAll(res.Body)
+		s.assert.NoError(err)
+		res.Body.Close()
+		bodies[strings.ReplaceAll(strings.TrimSpace(string(bd)), "\"", "")] += 1
+	}
+	s.assert.Len(statuses, 3)
+	s.assert.Len(bodies, 2)
+	s.assert.Equal(1, statuses[http.StatusInternalServerError])
+	s.assert.Equal(1, statuses[http.StatusOK])
+	s.assert.Equal(1, statuses[http.StatusTeapot])
+	s.assert.Equal(2, bodies["{name:any}"])
+	s.assert.Equal(1, bodies["{name:Form3}"])
+	return s
+}
+
 func (s *ConcurrentProxyStage) all_the_address_responses_should_have_the_right_status_code() *ConcurrentProxyStage {
 	expectedLen := s.concurrentAddressRequestsPerSecond * int(s.concurrentAddressRequestsDuration/time.Second)
 	s.assert.Len(s.addressResponses, expectedLen, "number of address responses is not as expected")
@@ -279,4 +300,41 @@ func (s *ConcurrentProxyStage) the_proxy_waits_for_all_address_responses() *Conc
 	s.assert.Len(s.addressResponses, want, "number of address responses is not as expected")
 
 	return s
+}
+
+func (s *ConcurrentProxyStage) the_concurrent_requests_are_sent_with_multiple_modifiers_for_same_interaction() {
+	err := s.pact.Verify(func() (err error) {
+		attempt := 1
+		s.proxy.ForInteraction(postNamePactWithAnyName).AddModifier("$.status", fmt.Sprintf("%d", http.StatusTeapot), &attempt)
+		attempt = 2
+		s.proxy.ForInteraction(postNamePactWithAnyName).AddModifier("$.status", fmt.Sprintf("%d", http.StatusInternalServerError), &attempt)
+		attempt = 3
+		s.proxy.ForInteraction(postNamePactWithAnyName).AddModifier("$.body.name", "Form3", &attempt)
+
+		wg := sync.WaitGroup{}
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			s.makeUserRequest()
+		}()
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			s.makeUserRequest()
+		}()
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			s.makeUserRequest()
+		}()
+
+		wg.Wait()
+
+		return nil
+	})
+
+	s.assert.NoError(err)
 }

@@ -34,6 +34,17 @@ func TestConcurrentRequestsForSameModifierBasedOnAttempt(t *testing.T) {
 		the_second_user_response_should_have_the_right_status_code_and_body()
 }
 
+func TestMultipleModifiersForSameInteraction(t *testing.T) {
+	given, when, then := NewConcurrentProxyStage(t)
+	given.
+		a_pact_that_allows_any_names()
+	when.
+		the_concurrent_requests_are_sent_with_multiple_modifiers_for_same_interaction()
+	then.
+		all_responses_should_have_the_expected_return_values()
+
+}
+
 func TestConcurrentRequestsWaitForAllPacts(t *testing.T) {
 	given, when, then := NewConcurrentProxyStage(t)
 
