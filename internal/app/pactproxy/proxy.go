@@ -173,19 +173,6 @@ func (a *api) interactionsPostHandler(c echo.Context) error {
 	interaction.recordHistory = a.recordHistory
 	a.interactions.Store(interaction)
 
-	go func() {
-		for {
-			select {
-			case <-interaction.updateChannel:
-				interaction.RequestCount += 1
-				interaction.getChannel <- interaction.RequestCount
-			case <-interaction.doneChannel:
-				return
-
-			}
-		}
-	}()
-
 	err = c.Request().Body.Close()
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, httpresponse.Error(err.Error()))
@@ -264,6 +251,11 @@ func (a *api) interactionsWaitHandler(c echo.Context) error {
 	return c.NoContent(http.StatusOK)
 }
 
+type matchedInteraction struct {
+	interaction  *Interaction
+	attemptCount int
+}
+
 func (a *api) indexHandler(c echo.Context) error {
 	req := c.Request()
 	log.Infof("proxying %s %s %+v", req.Method, req.URL.Path, req.Header)
@@ -312,15 +304,14 @@ func (a *api) indexHandler(c echo.Context) error {
 	request["headers"] = h
 
 	unmatched := make(map[string][]string)
-	matched := make([]*Interaction, 0)
+	matched := make([]matchedInteraction, 0)
 	for _, interaction := range allInteractions {
 		ok, info := interaction.EvaluateConstraints(request, a.interactions)
 		if ok {
-			interaction.StoreRequest(request)
-			go func() {
-				interaction.updateChannel <- struct{}{}
-			}()
-			matched = append(matched, interaction)
+			matched = append(matched, matchedInteraction{
+				interaction:  interaction,
+				attemptCount: interaction.StoreRequest(request),
+			})
 		} else {
 			unmatched[interaction.Description] = info
 		}
@@ -335,7 +326,7 @@ func (a *api) indexHandler(c echo.Context) error {
 	}
 
 	a.notify.Notify()
-	a.proxy.ServeHTTP(&ResponseModificationWriter{res: c.Response(), interactions: matched, attemptTracker: make(map[string]int)}, req)
+	a.proxy.ServeHTTP(&ResponseModificationWriter{res: c.Response(), matchedInteractions: matched}, req)
 	return nil
 }
 

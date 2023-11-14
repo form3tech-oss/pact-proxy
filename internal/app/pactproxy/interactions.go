@@ -17,8 +17,6 @@ func (i *Interactions) Store(interaction *Interaction) {
 
 func (i *Interactions) Clear() {
 	i.interactions.Range(func(k, _ interface{}) bool {
-		v, _ := i.interactions.Load(k)
-		v.(*Interaction).doneChannel <- struct{}{}
 		i.interactions.Delete(k)
 		return true
 	})
