@@ -173,6 +173,19 @@ func (a *api) interactionsPostHandler(c echo.Context) error {
 	interaction.recordHistory = a.recordHistory
 	a.interactions.Store(interaction)
 
+	go func() {
+		for {
+			select {
+			case <-interaction.updateChannel:
+				interaction.RequestCount += 1
+				interaction.getChannel <- interaction.RequestCount
+			case <-interaction.doneChannel:
+				return
+
+			}
+		}
+	}()
+
 	err = c.Request().Body.Close()
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, httpresponse.Error(err.Error()))
@@ -304,6 +317,9 @@ func (a *api) indexHandler(c echo.Context) error {
 		ok, info := interaction.EvaluateConstraints(request, a.interactions)
 		if ok {
 			interaction.StoreRequest(request)
+			go func() {
+				interaction.updateChannel <- struct{}{}
+			}()
 			matched = append(matched, interaction)
 		} else {
 			unmatched[interaction.Description] = info
@@ -319,7 +335,7 @@ func (a *api) indexHandler(c echo.Context) error {
 	}
 
 	a.notify.Notify()
-	a.proxy.ServeHTTP(&ResponseModificationWriter{res: c.Response(), interactions: matched}, req)
+	a.proxy.ServeHTTP(&ResponseModificationWriter{res: c.Response(), interactions: matched, attemptTracker: make(map[string]int)}, req)
 	return nil
 }
 

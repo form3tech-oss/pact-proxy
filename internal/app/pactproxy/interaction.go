@@ -43,6 +43,9 @@ func (m *regexPathMatcher) match(val string) bool {
 
 type Interaction struct {
 	mu             sync.RWMutex
+	updateChannel  chan struct{}
+	getChannel     chan int
+	doneChannel    chan struct{}
 	pathMatcher    pathMatcher
 	Method         string                           `json:"method"`
 	Alias          string                           `json:"alias"`
@@ -93,12 +96,15 @@ func LoadInteraction(data []byte, alias string) (*Interaction, error) {
 	propertiesWithMatchingRule := getBodyPropertiesWithMatchingRules(matchingRules)
 
 	interaction := &Interaction{
-		pathMatcher: matcher,
-		Method:      request["method"].(string),
-		Alias:       alias,
-		definition:  definition,
-		Description: description,
-		constraints: map[string]interactionConstraint{},
+		getChannel:    make(chan int, 100),
+		updateChannel: make(chan struct{}),
+		doneChannel:   make(chan struct{}),
+		pathMatcher:   matcher,
+		Method:        request["method"].(string),
+		Alias:         alias,
+		definition:    definition,
+		Description:   description,
+		constraints:   map[string]interactionConstraint{},
 	}
 
 	interaction.modifiers = interactionModifiers{
@@ -379,7 +385,6 @@ func (i *Interaction) StoreRequest(request requestDocument) {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 	i.LastRequest = request
-	i.RequestCount++
 
 	if i.recordHistory {
 		i.RequestHistory = append(i.RequestHistory, request)
@@ -387,11 +392,5 @@ func (i *Interaction) StoreRequest(request requestDocument) {
 }
 
 func (i *Interaction) HasRequests(count int) bool {
-	return i.getRequestCount() >= count
-}
-
-func (i *Interaction) getRequestCount() int {
-	i.mu.RLock()
-	defer i.mu.RUnlock()
-	return i.RequestCount
+	return i.RequestCount >= count
 }

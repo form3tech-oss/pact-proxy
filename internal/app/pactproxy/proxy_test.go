@@ -113,7 +113,8 @@ func TestInteractionsGetHandler(t *testing.T) {
 				return &interactions
 			}(),
 			code: http.StatusOK,
-			body: `{"method":"","alias":"test","description":"test","request_count":1,"last_request":{"body":{"foo":"bar"},"path":"/testpath"}}`,
+			// request_count is 0 as the interaction has not been matched yet
+			body: `{"method":"","alias":"test","description":"test","request_count":0,"last_request":{"body":{"foo":"bar"},"path":"/testpath"}}`,
 		},
 		{
 			name: "interaction found - with request history",
@@ -130,7 +131,8 @@ func TestInteractionsGetHandler(t *testing.T) {
 				return &interactions
 			}(),
 			code: http.StatusOK,
-			body: `{"method":"","alias":"test","description":"test","request_count":1,"request_history":[{"body":{"foo":"bar"},"path":"/testpath"}],"last_request":{"body":{"foo":"bar"},"path":"/testpath"}}`,
+			// request_count is 0 as the interaction has not been matched yet
+			body: `{"method":"","alias":"test","description":"test","request_count":0,"request_history":[{"body":{"foo":"bar"},"path":"/testpath"}],"last_request":{"body":{"foo":"bar"},"path":"/testpath"}}`,
 		},
 		{
 			name:         "interaction not found",
