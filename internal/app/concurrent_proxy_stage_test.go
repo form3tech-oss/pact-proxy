@@ -237,29 +237,22 @@ func (s *ConcurrentProxyStage) all_the_user_responses_should_have_the_right_stat
 	return s
 }
 
-func (s *ConcurrentProxyStage) the_second_user_response_should_have_the_right_status_code() *ConcurrentProxyStage {
-	c := 0
+func (s *ConcurrentProxyStage) the_second_user_response_should_have_the_right_status_code_and_body() *ConcurrentProxyStage {
+	statuses := make(map[int]int)
+	bodies := make(map[string]int)
 	for _, res := range s.userResponses {
-		if res.StatusCode == http.StatusConflict {
-			c++
-		}
-	}
-	s.assert.Equal(1, c)
-	return s
-}
-
-func (s *ConcurrentProxyStage) the_second_user_response_should_have_a_modified_body() *ConcurrentProxyStage {
-	c := 0
-	for _, res := range s.userResponses {
+		statuses[res.StatusCode] += 1
 		bd, err := io.ReadAll(res.Body)
 		s.assert.NoError(err)
 		res.Body.Close()
-
-		if strings.Contains(string(bd), "Form3") {
-			c++
-		}
+		bodies[strings.ReplaceAll(strings.TrimSpace(string(bd)), "\"", "")] += 1
 	}
-	s.assert.Equal(1, c)
+	s.assert.Len(statuses, 2)
+	s.assert.Len(bodies, 2)
+	s.assert.Equal(1, statuses[http.StatusConflict])
+	s.assert.Equal(1, statuses[http.StatusOK])
+	s.assert.Equal(1, bodies["{name:any}"])
+	s.assert.Equal(1, bodies["{name:Form3}"])
 	return s
 }
 
