@@ -375,7 +375,7 @@ func (i *Interaction) EvaluateConstraints(request requestDocument, interactions 
 	return result, violations
 }
 
-func (i *Interaction) StoreRequest(request requestDocument) {
+func (i *Interaction) StoreRequest(request requestDocument) int {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 	i.LastRequest = request
@@ -384,6 +384,7 @@ func (i *Interaction) StoreRequest(request requestDocument) {
 	if i.recordHistory {
 		i.RequestHistory = append(i.RequestHistory, request)
 	}
+	return i.RequestCount
 }
 
 func (i *Interaction) HasRequests(count int) bool {

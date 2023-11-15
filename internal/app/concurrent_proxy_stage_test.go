@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"sync"
@@ -152,6 +153,34 @@ func (s *ConcurrentProxyStage) the_concurrent_requests_are_sent() {
 	s.assert.NoError(err)
 }
 
+func (s *ConcurrentProxyStage) the_concurrent_requests_are_sent_with_attempt_based_modifier() {
+	err := s.pact.Verify(func() (err error) {
+		attempt := 2
+		s.proxy.ForInteraction(postNamePactWithAnyName).AddModifier("$.status", fmt.Sprintf("%d", http.StatusConflict), &attempt)
+		s.proxy.ForInteraction(postNamePactWithAnyName).AddModifier("$.body.name", "Form3", &attempt)
+
+		wg := sync.WaitGroup{}
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			s.makeUserRequest()
+		}()
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			s.makeUserRequest()
+		}()
+
+		wg.Wait()
+
+		return nil
+	})
+
+	s.assert.NoError(err)
+}
+
 func (s *ConcurrentProxyStage) makeUserRequest() {
 	u := fmt.Sprintf("http://localhost:%s/users", proxyURL.Port())
 	req, err := http.NewRequest("POST", u, strings.NewReader(`{"name":"jim"}`))
@@ -205,6 +234,25 @@ func (s *ConcurrentProxyStage) all_the_user_responses_should_have_the_right_stat
 		s.assert.Equal(res.StatusCode, s.modifiedNameStatusCode, "expected user status code")
 	}
 
+	return s
+}
+
+func (s *ConcurrentProxyStage) the_second_user_response_should_have_the_right_status_code_and_body() *ConcurrentProxyStage {
+	statuses := make(map[int]int)
+	bodies := make(map[string]int)
+	for _, res := range s.userResponses {
+		statuses[res.StatusCode] += 1
+		bd, err := io.ReadAll(res.Body)
+		s.assert.NoError(err)
+		res.Body.Close()
+		bodies[strings.ReplaceAll(strings.TrimSpace(string(bd)), "\"", "")] += 1
+	}
+	s.assert.Len(statuses, 2)
+	s.assert.Len(bodies, 2)
+	s.assert.Equal(1, statuses[http.StatusConflict])
+	s.assert.Equal(1, statuses[http.StatusOK])
+	s.assert.Equal(1, bodies["{name:any}"])
+	s.assert.Equal(1, bodies["{name:Form3}"])
 	return s
 }
 

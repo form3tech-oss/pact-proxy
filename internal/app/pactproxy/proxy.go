@@ -251,6 +251,11 @@ func (a *api) interactionsWaitHandler(c echo.Context) error {
 	return c.NoContent(http.StatusOK)
 }
 
+type matchedInteraction struct {
+	interaction  *Interaction
+	attemptCount int
+}
+
 func (a *api) indexHandler(c echo.Context) error {
 	req := c.Request()
 	log.Infof("proxying %s %s %+v", req.Method, req.URL.Path, req.Header)
@@ -299,12 +304,14 @@ func (a *api) indexHandler(c echo.Context) error {
 	request["headers"] = h
 
 	unmatched := make(map[string][]string)
-	matched := make([]*Interaction, 0)
+	matched := make([]matchedInteraction, 0)
 	for _, interaction := range allInteractions {
 		ok, info := interaction.EvaluateConstraints(request, a.interactions)
 		if ok {
-			interaction.StoreRequest(request)
-			matched = append(matched, interaction)
+			matched = append(matched, matchedInteraction{
+				interaction:  interaction,
+				attemptCount: interaction.StoreRequest(request),
+			})
 		} else {
 			unmatched[interaction.Description] = info
 		}
@@ -319,7 +326,7 @@ func (a *api) indexHandler(c echo.Context) error {
 	}
 
 	a.notify.Notify()
-	a.proxy.ServeHTTP(&ResponseModificationWriter{res: c.Response(), interactions: matched}, req)
+	a.proxy.ServeHTTP(&ResponseModificationWriter{res: c.Response(), matchedInteractions: matched}, req)
 	return nil
 }
 

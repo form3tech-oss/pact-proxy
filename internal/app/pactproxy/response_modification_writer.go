@@ -7,10 +7,10 @@ import (
 )
 
 type ResponseModificationWriter struct {
-	res              http.ResponseWriter
-	interactions     []*Interaction
-	originalResponse []byte
-	statusCode       int
+	res                 http.ResponseWriter
+	matchedInteractions []matchedInteraction
+	originalResponse    []byte
+	statusCode          int
 }
 
 func (m *ResponseModificationWriter) Header() http.Header {
@@ -29,8 +29,8 @@ func (m *ResponseModificationWriter) Write(b []byte) (int, error) {
 	}
 
 	var modifiedBody []byte
-	for _, i := range m.interactions {
-		modifiedBody, err = i.modifiers.modifyBody(m.originalResponse)
+	for _, i := range m.matchedInteractions {
+		modifiedBody, err = i.interaction.modifiers.modifyBody(m.originalResponse, i.attemptCount)
 		if err != nil {
 			return 0, err
 		}
@@ -51,8 +51,8 @@ func (m *ResponseModificationWriter) Write(b []byte) (int, error) {
 
 func (m *ResponseModificationWriter) WriteHeader(statusCode int) {
 	m.statusCode = statusCode
-	for _, i := range m.interactions {
-		ok, code := i.modifiers.modifyStatusCode()
+	for _, i := range m.matchedInteractions {
+		ok, code := i.interaction.modifiers.modifyStatusCode(i.attemptCount)
 		if ok {
 			m.statusCode = code
 			break
