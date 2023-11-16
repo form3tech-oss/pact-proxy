@@ -22,7 +22,13 @@ type interactionModifiers struct {
 }
 
 func (im *interactionModifier) Key() string {
-	return strings.Join([]string{im.Interaction, im.Path}, "_")
+	var key string
+	if im.Attempt != nil {
+		key = strings.Join([]string{im.Interaction, im.Path, strconv.Itoa(*im.Attempt)}, "_")
+	} else {
+		key = strings.Join([]string{im.Interaction, im.Path}, "_")
+	}
+	return key
 }
 
 func (ims *interactionModifiers) AddModifier(modifier *interactionModifier) {
