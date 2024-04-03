@@ -3,6 +3,8 @@ package app
 import (
 	"net/http"
 	"testing"
+
+	"github.com/pact-foundation/pact-go/dsl"
 )
 
 func TestLargePactResponse(t *testing.T) {
@@ -592,9 +594,9 @@ func TestArrayBodyRequestUnmatchedRequestBody(t *testing.T) {
 				a_request_is_sent_with("application/json", tc.unmatchedReqBody)
 
 			then.
-				// Pact Mock Server returns 500 if request body does not match,
-				// so the response status code is not checked
-				pact_verification_is_not_successful()
+				// Pact Mock Server returns 500 if request body does not match
+				pact_verification_is_not_successful().and().
+				the_response_is_(http.StatusInternalServerError)
 		})
 	}
 }
@@ -636,4 +638,205 @@ func TestArrayBodyRequestConstraintDoesNotMatch(t *testing.T) {
 				the_response_is_(http.StatusBadRequest)
 		})
 	}
+}
+
+func TestArrayNestedWithinBody(t *testing.T) {
+	pactReqBody := map[string]interface{}{
+		"entries": []interface{}{
+			map[string]string{"key": "val"},
+			map[string]string{"key": "val"},
+		},
+	}
+	const respContentType = "application/json"
+	const respBody = `[{"status":"ok"}]`
+
+	const matchedReqBody = `{"entries": [ {"key": "val"}, {"key": "val"} ]}`
+	const unmatchedReqBody = `{"entries": [ {"key": "val"}, {"key": "unexpected value"} ]}`
+	const unmatchedReqBodyAdditionalArrElem = `{"entries": [ {"key": "val"}, {"key": "val"}, {"key": "val"} ]}`
+
+	const matchedConstraintPath = "$.body.entries[0].key"
+	const matchedConstraintValue = "val"
+
+	const unmatchedConstraintPath = "$.body.entries[1].key"
+	const unmatchedConstraintValue = "wrong value"
+
+	const outOfBoundsConstraintPath = "$.body.entries[2].key"
+
+	t.Run("Matches", func(t *testing.T) {
+		given, when, then := NewProxyStage(t)
+
+		given.
+			a_pact_that_expects("application/json", pactReqBody, respContentType, respBody)
+
+		when.
+			a_request_is_sent_with("application/json", matchedReqBody)
+
+		then.
+			pact_verification_is_successful().and().
+			the_response_is_(http.StatusOK).and().
+			the_response_body_is(respBody)
+	})
+
+	t.Run("Does not match", func(t *testing.T) {
+		given, when, then := NewProxyStage(t)
+
+		given.
+			a_pact_that_expects("application/json", pactReqBody, respContentType, respBody)
+
+		when.
+			a_request_is_sent_with("application/json", unmatchedReqBody)
+
+		then.
+			pact_verification_is_not_successful().and().
+			the_response_is_(http.StatusBadRequest)
+	})
+
+	t.Run("Does not match - additional array element", func(t *testing.T) {
+		given, when, then := NewProxyStage(t)
+
+		given.
+			a_pact_that_expects("application/json", pactReqBody, respContentType, respBody)
+
+		when.
+			a_request_is_sent_with("application/json", unmatchedReqBodyAdditionalArrElem)
+
+		then.
+			pact_verification_is_not_successful().and().
+			the_response_is_(http.StatusBadRequest)
+	})
+
+	t.Run("Matches with additional constraint", func(t *testing.T) {
+		given, when, then := NewProxyStage(t)
+
+		given.
+			a_pact_that_expects("application/json", pactReqBody, respContentType, respBody).and().
+			an_additional_constraint_is_added(matchedConstraintPath, matchedConstraintValue)
+
+		when.
+			a_request_is_sent_with("application/json", matchedReqBody)
+
+		then.
+			pact_verification_is_successful().and().
+			the_response_is_(http.StatusOK).and().
+			the_response_body_is(respBody)
+	})
+
+	t.Run("Does not match due to additional constraint with different value", func(t *testing.T) {
+		given, when, then := NewProxyStage(t)
+
+		given.
+			a_pact_that_expects("application/json", pactReqBody, respContentType, respBody).and().
+			an_additional_constraint_is_added(unmatchedConstraintPath, unmatchedConstraintValue)
+
+		when.
+			a_request_is_sent_with("application/json", matchedReqBody)
+
+		then.
+			pact_verification_is_not_successful().and().
+			the_response_is_(http.StatusBadRequest)
+	})
+
+	t.Run("Does not match due to additional constraint out of array bounds", func(t *testing.T) {
+		given, when, then := NewProxyStage(t)
+
+		given.
+			a_pact_that_expects("application/json", pactReqBody, respContentType, respBody).and().
+			an_additional_constraint_is_added(outOfBoundsConstraintPath, matchedConstraintValue)
+
+		when.
+			a_request_is_sent_with("application/json", matchedReqBody)
+
+		then.
+			pact_verification_is_not_successful().and().
+			the_response_is_(http.StatusBadRequest)
+	})
+}
+
+// Matching rules are not enforced by Pact proxy, so this test is checking that constraints aren't being
+// applied when matching rules are specified, leading to the request being handled by Pact server.
+// Note: these tests are using pact DSL style matching rules. Pact proxy identifies these, but differently to
+// ones specified in the "matchingRules" JSON property. Loading of the "matchingRules" JSON property style
+// gets unit tested in TestLoadInteractionJSONConstraints.
+func TestArrayNestedWithinBodyContainingMatchers_NoConstraint(t *testing.T) {
+	pactReqBody := map[string]interface{}{
+		"entries": []interface{}{
+			map[string]any{"key": "val"},
+			map[string]any{"key": dsl.Term("a", "(a|b)")},
+		},
+	}
+	const respContentType = "application/json"
+	const respBody = `[{"status":"ok"}]`
+
+	const matchedReqBody = `{"entries": [ {"key": "val"}, {"key": "a"} ]}`
+	const unmatchedReqBody = `{"entries": [ {"key": "val"}, {"key": "c"} ]}`
+
+	t.Run("Matches", func(t *testing.T) {
+		given, when, then := NewProxyStage(t)
+
+		given.
+			a_pact_that_expects("application/json", pactReqBody, respContentType, respBody)
+
+		when.
+			a_request_is_sent_with("application/json", matchedReqBody)
+
+		then.
+			pact_verification_is_successful().and().
+			the_response_is_(http.StatusOK).and().
+			the_response_body_is(respBody)
+	})
+
+	t.Run("Does not match", func(t *testing.T) {
+		given, when, then := NewProxyStage(t)
+
+		given.
+			a_pact_that_expects("application/json", pactReqBody, respContentType, respBody)
+
+		when.
+			a_request_is_sent_with("application/json", unmatchedReqBody)
+
+		then.
+			pact_verification_is_not_successful().and().
+			// Since the request is passed to Pact Server, the response for not matching is 500
+			the_response_is_(http.StatusInternalServerError)
+	})
+}
+
+func TestEmptyArrayNestedWithinBody(t *testing.T) {
+	pactReqBody := map[string]interface{}{
+		"entries": []interface{}{},
+	}
+	const respContentType = "application/json"
+	const respBody = `[{"status":"ok"}]`
+
+	const matchedReqBody = `{"entries": []}`
+	const unmatchedReqBody = `{"entries": [ {"key": "val"} ]}`
+
+	t.Run("Matches", func(t *testing.T) {
+		given, when, then := NewProxyStage(t)
+
+		given.
+			a_pact_that_expects("application/json", pactReqBody, respContentType, respBody)
+
+		when.
+			a_request_is_sent_with("application/json", matchedReqBody)
+
+		then.
+			pact_verification_is_successful().and().
+			the_response_is_(http.StatusOK).and().
+			the_response_body_is(respBody)
+	})
+
+	t.Run("Does not match", func(t *testing.T) {
+		given, when, then := NewProxyStage(t)
+
+		given.
+			a_pact_that_expects("application/json", pactReqBody, respContentType, respBody)
+
+		when.
+			a_request_is_sent_with("application/json", unmatchedReqBody)
+
+		then.
+			pact_verification_is_not_successful().and().
+			the_response_is_(http.StatusBadRequest)
+	})
 }

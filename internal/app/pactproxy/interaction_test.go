@@ -120,6 +120,114 @@ func TestLoadInteractionPlainTextConstraints(t *testing.T) {
 	}
 }
 
+func TestLoadInteractionJSONConstraints(t *testing.T) {
+	arrMatchersNotPresent := `{
+		"description": "A request to create an address",
+		"request": {
+		  "method": "POST",
+		  "path": "/addresses",
+		  "headers": {
+			"Content-Type": "application/json"
+		  },
+		  "body": {
+			"addressLines": ["line 1", "line 2"]
+		  }
+		},
+		"response": {
+		  "status": 200,
+		  "headers": {
+			"Content-Type": "application/json"
+		  },
+		  "body": {
+			"addressLines": ["line 1", "line 2"]
+		  }
+		}
+	  }`
+	arrMatcherPresent :=
+		`{
+		"description": "A request to create an address",
+		"request": {
+		  "method": "POST",
+		  "path": "/addresses",
+		  "headers": {
+			"Content-Type": "application/json"
+		  },
+		  "body": {
+			"addressLines": ["line 1", "line 2"]
+		  },
+		  "matchingRules": {
+			"$.body.addressLines[0]": {
+			  "regex": ".*"
+			}
+		  }
+		},
+		"response": {
+		  "status": 200,
+		  "headers": {
+			"Content-Type": "application/json"
+		  },
+		  "body": {
+			"addressLines": ["line 1", "line 2"]
+		  }
+		}
+	  }`
+	tests := []struct {
+		name            string
+		interaction     []byte
+		wantConstraints []interactionConstraint
+	}{
+		{
+			name:        "array and matcher not present - interactions are created per element",
+			interaction: []byte(arrMatchersNotPresent),
+			wantConstraints: []interactionConstraint{
+				{
+					Path:   "$.body.addressLines[0]",
+					Format: "%v",
+					Values: []interface{}{"line 1"},
+				},
+				{
+					Path:   "$.body.addressLines[1]",
+					Format: "%v",
+					Values: []interface{}{"line 2"},
+				},
+				{
+					Path:   "$.body.addressLines",
+					Format: fmtLen,
+					Values: []interface{}{2},
+				},
+			},
+		},
+		{
+			name:        "array and matcher present - interaction is not created for matched element",
+			interaction: []byte(arrMatcherPresent),
+			wantConstraints: []interactionConstraint{
+				{
+					Path:   "$.body.addressLines[1]",
+					Format: "%v",
+					Values: []interface{}{"line 2"},
+				},
+				{
+					Path:   "$.body.addressLines",
+					Format: fmtLen,
+					Values: []interface{}{2},
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			interaction, err := LoadInteraction(tt.interaction, "alias")
+			require.NoError(t, err)
+
+			actual := make([]interactionConstraint, 0, len(interaction.constraints))
+			for _, constraint := range interaction.constraints {
+				actual = append(actual, constraint)
+			}
+			assert.ElementsMatch(t, tt.wantConstraints, actual)
+		})
+	}
+}
+
 // This test asserts that given a pact v3-style nested matching rule, a constraint
 // is not created for the corresponding property
 func TestV3MatchingRulesLeadToCorrectConstraints(t *testing.T) {

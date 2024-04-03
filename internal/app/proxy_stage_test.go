@@ -451,8 +451,7 @@ func (s *ProxyStage) the_nth_response_body_is(n int, data []byte) *ProxyStage {
 	s.assert.GreaterOrEqual(len(s.responseBodies), n, "number of request bodies is les than expected")
 
 	body := s.responseBodies[n-1]
-	c := bytes.Compare(body, data)
-	s.assert.Equal(0, c, "Expected body did not match")
+	s.assert.Equal(data, body, "Expected body did not match")
 	return s
 }
 
