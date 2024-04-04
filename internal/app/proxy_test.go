@@ -559,7 +559,6 @@ func TestArrayBodyRequest(t *testing.T) {
 				the_response_body_is(tc.respBody)
 		})
 	}
-
 }
 
 func TestArrayBodyRequestWithModifiedStatusCode(t *testing.T) {
@@ -594,9 +593,9 @@ func TestArrayBodyRequestUnmatchedRequestBody(t *testing.T) {
 				a_request_is_sent_with("application/json", tc.unmatchedReqBody)
 
 			then.
-				// Pact Mock Server returns 500 if request body does not match
+				// Pact Proxy returns 400 if request body does not match
 				pact_verification_is_not_successful().and().
-				the_response_is_(http.StatusInternalServerError)
+				the_response_is_(http.StatusBadRequest)
 		})
 	}
 }

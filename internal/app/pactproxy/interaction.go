@@ -117,18 +117,8 @@ func LoadInteraction(data []byte, alias string) (*Interaction, error) {
 
 	switch mediaType {
 	case mediaTypeJSON:
-		if jsonRequestBody, ok := requestBody.(map[string]interface{}); ok {
-			interaction.addJSONConstraintsFromPact("$.body", propertiesWithMatchingRule, jsonRequestBody)
-			return interaction, nil
-		}
-
-		if _, ok := requestBody.([]interface{}); ok {
-			// An array request body should be accepted for application/json media type.
-			// However, no constraint is added for it
-			return interaction, nil
-		}
-
-		return nil, fmt.Errorf("media type is %s but body is not json", mediaType)
+		interaction.addJSONConstraintsFromPact("$.body", propertiesWithMatchingRule, requestBody)
+		return interaction, nil
 	case mediaTypeText, mediaTypeCsv, mediaTypeXml:
 		if body, ok := requestBody.(string); ok {
 			interaction.addTextConstraintsFromPact(propertiesWithMatchingRule, body)
@@ -271,17 +261,10 @@ func parseMediaType(request map[string]interface{}) (string, error) {
 
 // This function adds constraints for all the fields in the JSON request body which do not
 // have a corresponding matching rule
-func (i *Interaction) addJSONConstraintsFromPact(path string, matchingRules map[string]bool, values map[string]interface{}) {
-	for k, v := range values {
-		i.addJSONConstraintsFromPactAny(path+"."+k, matchingRules, v)
-	}
-}
-
-func (i *Interaction) addJSONConstraintsFromPactAny(path string, matchingRules map[string]bool, value interface{}) {
+func (i *Interaction) addJSONConstraintsFromPact(path string, matchingRules map[string]bool, value interface{}) {
 	if _, hasRule := matchingRules[path]; hasRule {
 		return
 	}
-
 	switch val := value.(type) {
 	case map[string]interface{}:
 		// json_class is used to test for a Pact DSL-style matching rule within the body. The matchingRules passed
@@ -289,11 +272,13 @@ func (i *Interaction) addJSONConstraintsFromPactAny(path string, matchingRules m
 		if _, exists := val["json_class"]; exists {
 			return
 		}
-		i.addJSONConstraintsFromPact(path, matchingRules, val)
+		for k, v := range val {
+			i.addJSONConstraintsFromPact(path+"."+k, matchingRules, v)
+		}
 	case []interface{}:
 		// Create constraints for each element in the array. This allows matching rules to override them.
 		for j := range val {
-			i.addJSONConstraintsFromPactAny(fmt.Sprintf("%s[%d]", path, j), matchingRules, val[j])
+			i.addJSONConstraintsFromPact(fmt.Sprintf("%s[%d]", path, j), matchingRules, val[j])
 		}
 		// Length constraint so that requests with additional elements at the end of the array will not match
 		i.AddConstraint(interactionConstraint{
