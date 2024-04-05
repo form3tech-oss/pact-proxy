@@ -1,6 +1,6 @@
 module github.com/form3tech-oss/pact-proxy
 
-go 1.18
+go 1.22
 
 require (
 	github.com/PaesslerAG/jsonpath v0.1.1

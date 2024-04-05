@@ -1,4 +1,4 @@
-FROM golang:1.18-alpine AS build-env
+FROM golang:1.22-alpine AS build-env
 
 ARG APPNAME
 ENV GO111MODULE=auto
