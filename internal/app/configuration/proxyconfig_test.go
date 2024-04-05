@@ -21,9 +21,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/form3tech-oss/pact-proxy/internal/app/pactproxy"
 	"github.com/pact-foundation/pact-go/utils"
 	"github.com/stretchr/testify/require"
+
+	"github.com/form3tech-oss/pact-proxy/internal/app/pactproxy"
 )
 
 const (
@@ -181,6 +182,16 @@ func TestConfigureProxy_MTLS(t *testing.T) {
 		expected := fmt.Sprintf("Hello, %s\n", names[i])
 		require.Equal(t, expected, string(greeting))
 	}
+}
+
+// When no server address env var is specified, config.ServerAddress should be the zero value.
+// This is used during ConfigureProxy logic, but is no longer the default behaviour of envconfig.Process due to url.URL
+// containing a pointer.
+func TestProxyConfig_NewFromEnv_EmptyServerAddress(t *testing.T) {
+	os.Clearenv()
+	config, err := NewFromEnv()
+	require.NoError(t, err)
+	require.Equal(t, url.URL{}, config.ServerAddress)
 }
 
 func TestProxyConfig_ForwardUnrecognisedRequests(t *testing.T) {

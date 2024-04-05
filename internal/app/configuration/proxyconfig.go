@@ -4,16 +4,20 @@ import (
 	"context"
 	"net/url"
 
-	"github.com/form3tech-oss/pact-proxy/internal/app/pactproxy"
 	"github.com/pkg/errors"
 	"github.com/sethvargo/go-envconfig"
+
+	"github.com/form3tech-oss/pact-proxy/internal/app/pactproxy"
 )
 
 func NewFromEnv() (pactproxy.Config, error) {
 	ctx := context.Background()
 
 	var config pactproxy.Config
-	err := envconfig.Process(ctx, &config)
+	err := envconfig.ProcessWith(ctx, &envconfig.Config{
+		Target:        &config,
+		DefaultNoInit: true,
+	})
 	if err != nil {
 		return config, errors.Wrap(err, "process env config")
 	}
