@@ -120,6 +120,192 @@ func TestLoadInteractionPlainTextConstraints(t *testing.T) {
 	}
 }
 
+func TestLoadInteractionJSONConstraints(t *testing.T) {
+	nestedArrMatchersNotPresent := `{
+		"description": "A request to create an address",
+		"request": {
+		  "method": "POST",
+		  "path": "/addresses",
+		  "headers": {
+			"Content-Type": "application/json"
+		  },
+		  "body": {
+			"addressLines": ["line 1", "line 2"]
+		  }
+		},
+		"response": {
+		  "status": 200,
+		  "headers": {
+			"Content-Type": "application/json"
+		  },
+		  "body": {
+			"addressLines": ["line 1", "line 2"]
+		  }
+		}
+	  }`
+	nestedArrMatcherPresent :=
+		`{
+		"description": "A request to create an address",
+		"request": {
+		  "method": "POST",
+		  "path": "/addresses",
+		  "headers": {
+			"Content-Type": "application/json"
+		  },
+		  "body": {
+			"addressLines": ["line 1", "line 2"]
+		  },
+		  "matchingRules": {
+			"$.body.addressLines[0]": {
+			  "regex": ".*"
+			}
+		  }
+		},
+		"response": {
+		  "status": 200,
+		  "headers": {
+			"Content-Type": "application/json"
+		  },
+		  "body": {
+			"addressLines": ["line 1", "line 2"]
+		  }
+		}
+	  }`
+	arrayOfStrings := `{
+		"description": "A request to create an address",
+		"request": {
+		  "method": "POST",
+		  "path": "/addresses",
+		  "headers": {
+			"Content-Type": "application/json"
+		  },
+		  "body": ["line 1", "line 2"]
+		},
+		"response": {
+		  "status": 200,
+		  "headers": {
+			"Content-Type": "application/json"
+		  },
+		  "body": ["line 1", "line 2"]
+		}
+	  }`
+	arrayOfObjects := `{
+		"description": "A request to create an address",
+		"request": {
+			"method": "POST",
+			"path": "/addresses",
+			"headers": {
+			"Content-Type": "application/json"
+			},
+			"body": [ {"key": "val"}, {"key": "val"} ]
+		},
+		"response": {
+			"status": 200,
+			"headers": {
+			"Content-Type": "application/json"
+			},
+			"body": [ {"key": "val"}, {"key": "val"} ]
+		}
+	  }`
+	tests := []struct {
+		name            string
+		interaction     []byte
+		wantConstraints []interactionConstraint
+	}{
+		{
+			name:        "nested array and matcher not present - interactions are created per element",
+			interaction: []byte(nestedArrMatchersNotPresent),
+			wantConstraints: []interactionConstraint{
+				{
+					Path:   "$.body.addressLines[0]",
+					Format: "%v",
+					Values: []interface{}{"line 1"},
+				},
+				{
+					Path:   "$.body.addressLines[1]",
+					Format: "%v",
+					Values: []interface{}{"line 2"},
+				},
+				{
+					Path:   "$.body.addressLines",
+					Format: fmtLen,
+					Values: []interface{}{2},
+				},
+			},
+		},
+		{
+			name:        "nested array and matcher present - interaction is not created for matched element",
+			interaction: []byte(nestedArrMatcherPresent),
+			wantConstraints: []interactionConstraint{
+				{
+					Path:   "$.body.addressLines[1]",
+					Format: "%v",
+					Values: []interface{}{"line 2"},
+				},
+				{
+					Path:   "$.body.addressLines",
+					Format: fmtLen,
+					Values: []interface{}{2},
+				},
+			},
+		},
+		{
+			name:        "body array and matcher not present - interactions are created per element",
+			interaction: []byte(arrayOfStrings),
+			wantConstraints: []interactionConstraint{
+				{
+					Path:   "$.body[0]",
+					Format: "%v",
+					Values: []interface{}{"line 1"},
+				},
+				{
+					Path:   "$.body[1]",
+					Format: "%v",
+					Values: []interface{}{"line 2"},
+				},
+				{
+					Path:   "$.body",
+					Format: fmtLen,
+					Values: []interface{}{2},
+				},
+			},
+		},
+		{
+			name:        "body array of objects - interactions are created per element",
+			interaction: []byte(arrayOfObjects),
+			wantConstraints: []interactionConstraint{
+				{
+					Path:   "$.body[0].key",
+					Format: "%v",
+					Values: []interface{}{"val"},
+				},
+				{
+					Path:   "$.body[1].key",
+					Format: "%v",
+					Values: []interface{}{"val"},
+				},
+				{
+					Path:   "$.body",
+					Format: fmtLen,
+					Values: []interface{}{2},
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			interaction, err := LoadInteraction(tt.interaction, "alias")
+			require.NoError(t, err)
+
+			actual := make([]interactionConstraint, 0, len(interaction.constraints))
+			for _, constraint := range interaction.constraints {
+				actual = append(actual, constraint)
+			}
+			assert.ElementsMatch(t, tt.wantConstraints, actual)
+		})
+	}
+}
+
 // This test asserts that given a pact v3-style nested matching rule, a constraint
 // is not created for the corresponding property
 func TestV3MatchingRulesLeadToCorrectConstraints(t *testing.T) {
@@ -250,140 +436,6 @@ func TestV3MatchingRulesLeadToCorrectConstraints(t *testing.T) {
 			}
 
 			assert.EqualValues(t, tt.wantConstraint, foundConstraint)
-		})
-	}
-}
-
-func TestLoadArrayRequestBodyInteractions(t *testing.T) {
-	arrayOfStrings := `{
-		"description": "A request to create an address",
-		"request": {
-		  "method": "POST",
-		  "path": "/addresses",
-		  "headers": {
-			"Content-Type": "application/json"
-		  },
-		  "body": ["a", "b", "c"]
-		},
-		"response": {
-		  "status": 200,
-		  "headers": {
-			"Content-Type": "application/json"
-		  },
-		  "body": ["a", "b", "c"]
-		}
-	  }`
-	arrayOfInts := `{
-		"description": "A request to create an address",
-		"request": {
-			"method": "POST",
-			"path": "/addresses",
-			"headers": {
-			"Content-Type": "application/json"
-			},
-			"body": [1, 2, 3]
-		},
-		"response": {
-			"status": 200,
-			"headers": {
-			"Content-Type": "application/json"
-			},
-			"body": [1, 2, 3]
-		}
-		}`
-	arrayOfBools := `{
-			"description": "A request to create an address",
-			"request": {
-				"method": "POST",
-				"path": "/addresses",
-				"headers": {
-				"Content-Type": "application/json"
-				},
-				"body": [true, false, true]
-			},
-			"response": {
-				"status": 200,
-				"headers": {
-				"Content-Type": "application/json"
-				},
-				"body": [true, false, true]
-			}
-			}`
-	arrayOfObjects := `{
-			"description": "A request to create an address",
-			"request": {
-				"method": "POST",
-				"path": "/addresses",
-				"headers": {
-				"Content-Type": "application/json"
-				},
-				"body": [ {"key": "val"}, {"key": "val"} ]
-			},
-			"response": {
-				"status": 200,
-				"headers": {
-				"Content-Type": "application/json"
-				},
-				"body": [ {"key": "val"}, {"key": "val"} ]
-			}
-			}`
-	arrayOfStringsWithMatcher :=
-		`{
-		"description": "A request to create an address",
-		"request": {
-		  "method": "POST",
-		  "path": "/addresses",
-			"headers": {
-			"Content-Type": "application/json"
-		  },
-		  "body": ["a", "b", "c"],
-		  "matchingRules": {
-				"$.body": {
-					"match": "type"
-				}
-			}
-		},
-		"response": {
-		  "status": 200,
-		  "headers": {
-			"Content-Type": "application/json"
-			},
-			"body": ["a", "b", "c"]
-		}
-	  }`
-
-	tests := []struct {
-		name        string
-		interaction []byte
-	}{
-		{
-			name:        "array of strings",
-			interaction: []byte(arrayOfStrings),
-		},
-		{
-			name:        "array of ints",
-			interaction: []byte(arrayOfInts),
-		},
-		{
-			name:        "array of bools",
-			interaction: []byte(arrayOfBools),
-		},
-		{
-			name:        "array of objects",
-			interaction: []byte(arrayOfObjects),
-		},
-		{
-			name:        "array of strings with matcher",
-			interaction: []byte(arrayOfStringsWithMatcher),
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			interaction, err := LoadInteraction(tt.interaction, "alias")
-			require.NoError(t, err, "unexpected error %v", err)
-
-			require.Empty(t, interaction.constraints, "No constraint should be added for the interaction")
 		})
 	}
 }

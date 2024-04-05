@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"mime"
-	"reflect"
 	"regexp"
 	"strings"
 	"sync"
@@ -118,18 +117,8 @@ func LoadInteraction(data []byte, alias string) (*Interaction, error) {
 
 	switch mediaType {
 	case mediaTypeJSON:
-		if jsonRequestBody, ok := requestBody.(map[string]interface{}); ok {
-			interaction.addJSONConstraintsFromPact("$.body", propertiesWithMatchingRule, jsonRequestBody)
-			return interaction, nil
-		}
-
-		if _, ok := requestBody.([]interface{}); ok {
-			// An array request body should be accepted for application/json media type.
-			// However, no constraint is added for it
-			return interaction, nil
-		}
-
-		return nil, fmt.Errorf("media type is %s but body is not json", mediaType)
+		interaction.addJSONConstraintsFromPact("$.body", propertiesWithMatchingRule, requestBody)
+		return interaction, nil
 	case mediaTypeText, mediaTypeCsv, mediaTypeXml:
 		if body, ok := requestBody.(string); ok {
 			interaction.addTextConstraintsFromPact(propertiesWithMatchingRule, body)
@@ -202,6 +191,8 @@ func getPathRegex(matchingRules map[string]interface{}) (string, error) {
 	return regexString, nil
 }
 
+// Gets the pact JSON file style matching rules from the "matchingRules" property of the request.
+// Note that Pact DSL style matching rules within the body are identified later when adding JSON constraints.
 func getMatchingRules(request map[string]interface{}) map[string]interface{} {
 	rules, hasRules := request["matchingRules"]
 	if !hasRules {
@@ -270,24 +261,37 @@ func parseMediaType(request map[string]interface{}) (string, error) {
 
 // This function adds constraints for all the fields in the JSON request body which do not
 // have a corresponding matching rule
-func (i *Interaction) addJSONConstraintsFromPact(path string, matchingRules map[string]bool, values map[string]interface{}) {
-	for k, v := range values {
-		switch val := v.(type) {
-		case map[string]interface{}:
-			if _, exists := val["json_class"]; exists {
-				continue
-			}
-			i.addJSONConstraintsFromPact(path+"."+k, matchingRules, val)
-		default:
-			p := path + "." + k
-			if _, hasRule := matchingRules[p]; !hasRule {
-				i.AddConstraint(interactionConstraint{
-					Path:   p,
-					Format: "%v",
-					Values: []interface{}{val},
-				})
-			}
+func (i *Interaction) addJSONConstraintsFromPact(path string, matchingRules map[string]bool, value interface{}) {
+	if _, hasRule := matchingRules[path]; hasRule {
+		return
+	}
+	switch val := value.(type) {
+	case map[string]interface{}:
+		// json_class is used to test for a Pact DSL-style matching rule within the body. The matchingRules passed
+		// to this method will not include these.
+		if _, exists := val["json_class"]; exists {
+			return
 		}
+		for k, v := range val {
+			i.addJSONConstraintsFromPact(path+"."+k, matchingRules, v)
+		}
+	case []interface{}:
+		// Create constraints for each element in the array. This allows matching rules to override them.
+		for j := range val {
+			i.addJSONConstraintsFromPact(fmt.Sprintf("%s[%d]", path, j), matchingRules, val[j])
+		}
+		// Length constraint so that requests with additional elements at the end of the array will not match
+		i.AddConstraint(interactionConstraint{
+			Path:   path,
+			Format: fmtLen,
+			Values: []interface{}{len(val)},
+		})
+	default:
+		i.AddConstraint(interactionConstraint{
+			Path:   path,
+			Format: "%v",
+			Values: []interface{}{val},
+		})
 	}
 }
 
@@ -341,10 +345,10 @@ func (i *Interaction) EvaluateConstraints(request requestDocument, interactions 
 	i.mu.RLock()
 	defer i.mu.RUnlock()
 	for _, constraint := range i.constraints {
-		values := constraint.Values
+		expected := constraint.Values
 		if constraint.Source != "" {
 			var err error
-			values, err = i.loadValuesFromSource(constraint, interactions)
+			expected, err = i.loadValuesFromSource(constraint, interactions)
 			if err != nil {
 				violations = append(violations, err.Error())
 				result = false
@@ -352,22 +356,16 @@ func (i *Interaction) EvaluateConstraints(request requestDocument, interactions 
 			}
 		}
 
-		actual := ""
-		val, err := jsonpath.Get(request.encodeValues(constraint.Path), map[string]interface{}(request))
+		actual, err := jsonpath.Get(request.encodeValues(constraint.Path), map[string]interface{}(request))
 		if err != nil {
-			log.Warn(err)
-		}
-		if reflect.TypeOf(val) == reflect.TypeOf([]interface{}{}) {
-			log.Infof("skipping matching on []interface{} type for path '%s'", constraint.Path)
+			violations = append(violations,
+				fmt.Sprintf("constraint path %q cannot be resolved within request: %q", constraint.Path, err))
+			result = false
 			continue
 		}
-		if err == nil {
-			actual = fmt.Sprintf("%v", val)
-		}
 
-		expected := fmt.Sprintf(constraint.Format, values...)
-		if actual != expected {
-			violations = append(violations, fmt.Sprintf("value '%s' at path '%s' does not match constraint '%s'", actual, constraint.Path, expected))
+		if err := constraint.check(expected, actual); err != nil {
+			violations = append(violations, err.Error())
 			result = false
 		}
 	}
