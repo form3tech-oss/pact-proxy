@@ -117,18 +117,22 @@ func (s *ProxyStage) and() *ProxyStage {
 }
 
 func (s *ProxyStage) a_pact_that_allows_any_names() *ProxyStage {
+	return s.a_pact_that_allows_any_names_for_content("application/json")
+}
+
+func (s *ProxyStage) a_pact_that_allows_any_names_for_content(contentType string) *ProxyStage {
 	s.pact.
 		AddInteraction().
 		UponReceiving(s.pactName).
 		WithRequest(dsl.Request{
 			Method:  "POST",
 			Path:    dsl.String("/users"),
-			Headers: dsl.MapMatcher{"Content-Type": dsl.String("application/json")},
+			Headers: dsl.MapMatcher{"Content-Type": dsl.String(contentType)},
 			Body:    dsl.MapMatcher{"name": dsl.Regex("any", ".*")},
 		}).
 		WillRespondWith(dsl.Response{
 			Status:  200,
-			Headers: dsl.MapMatcher{"Content-Type": dsl.String("application/json")},
+			Headers: dsl.MapMatcher{"Content-Type": dsl.String(contentType)},
 			Body:    map[string]string{"name": "any"},
 		})
 	return s

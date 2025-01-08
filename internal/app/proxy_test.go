@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -89,6 +90,21 @@ func TestConstraintHeaderMatch(t *testing.T) {
 
 	when.
 		a_request_is_sent_using_the_name("sam")
+
+	then.
+		pact_verification_is_successful().and().
+		pact_can_be_generated()
+}
+
+func TestConstraintHeaderMatchJSONAPIContent(t *testing.T) {
+	given, when, then := NewProxyStage(t)
+
+	given.
+		a_pact_that_allows_any_names_for_content("application/vnd.api+json").and().
+		a_content_type_constraint_is_added("application/vnd.api+json")
+
+	when.
+		n_requests_are_sent_using_the_body_and_content_type(1, fmt.Sprintf(`{"name":"%s"}`, "sam"), "application/vnd.api+json")
 
 	then.
 		pact_verification_is_successful().and().
