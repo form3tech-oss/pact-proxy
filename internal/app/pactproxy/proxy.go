@@ -36,10 +36,11 @@ type Config struct {
 }
 
 var supportedMediaTypes = map[string]func([]byte, *url.URL) (requestDocument, error){
-	mediaTypeJSON: ParseJSONRequest,
-	mediaTypeText: ParsePlainTextRequest,
-	mediaTypeCsv:  ParsePlainTextRequest,
-	mediaTypeXml:  ParsePlainTextRequest,
+	mediaTypeJSON:    ParseJSONRequest,
+	mediaTypeJSONAPI: ParseJSONRequest,
+	mediaTypeText:    ParsePlainTextRequest,
+	mediaTypeCsv:     ParsePlainTextRequest,
+	mediaTypeXml:     ParsePlainTextRequest,
 }
 
 type api struct {

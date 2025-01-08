@@ -14,10 +14,11 @@ import (
 )
 
 const (
-	mediaTypeJSON = "application/json"
-	mediaTypeText = "text/plain"
-	mediaTypeXml  = "application/xml"
-	mediaTypeCsv  = "text/csv"
+	mediaTypeJSON    = "application/json"
+	mediaTypeJSONAPI = "application/vnd.api+json"
+	mediaTypeText    = "text/plain"
+	mediaTypeXml     = "application/xml"
+	mediaTypeCsv     = "text/csv"
 )
 
 type pathMatcher interface {
@@ -116,7 +117,7 @@ func LoadInteraction(data []byte, alias string) (*Interaction, error) {
 	}
 
 	switch mediaType {
-	case mediaTypeJSON:
+	case mediaTypeJSON, mediaTypeJSONAPI:
 		interaction.addJSONConstraintsFromPact("$.body", propertiesWithMatchingRule, requestBody)
 		return interaction, nil
 	case mediaTypeText, mediaTypeCsv, mediaTypeXml:
