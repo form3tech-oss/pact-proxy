@@ -618,3 +618,50 @@ func Test_getPathRegex(t *testing.T) {
 		})
 	}
 }
+
+func Test_loadValuesFromSource(t *testing.T) {
+	lastRequest := map[string]any{
+		"body": map[string]any{
+			"name": "sam",
+		},
+	}
+	tests := []*struct {
+		name              string
+		sourceInteraction *Interaction
+		constraints       interactionConstraint
+		want              interface{}
+		wantErr           bool
+	}{
+		{
+			name: "",
+			sourceInteraction: &Interaction{
+				Alias:       "first-interaction",
+				LastRequest: lastRequest,
+			},
+			constraints: interactionConstraint{
+				Interaction: "first-interaction",
+				Path:        "$.path",
+				Values:      []interface{}{"$.body.name"},
+				Format:      "/v1/resource/%s/subresource",
+				Source:      "",
+			},
+			want:    []interface{}{"sam"},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			i := &Interaction{}
+			inter := &Interactions{}
+			inter.Store(tt.sourceInteraction)
+			got, err := i.loadValuesFromSource(tt.constraints, inter)
+			if tt.wantErr {
+				assert.NotNil(t, err)
+			} else {
+				assert.Nil(t, err)
+			}
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
