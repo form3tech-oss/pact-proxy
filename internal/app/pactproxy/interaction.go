@@ -333,7 +333,7 @@ func (i *Interaction) loadValuesFromSource(constraint interactionConstraint, int
 	}
 
 	for i, v := range constraint.Values {
-		values[i], _ = jsonpath.Get(v.(string), sourceRequest)
+		values[i], _ = jsonpath.Get(v.(string), map[string]interface{}(sourceRequest))
 	}
 
 	return values, nil
