@@ -325,9 +325,9 @@ func (i *Interaction) loadValuesFromSource(constraint interactionConstraint, int
 		return nil, errors.Errorf("cannot find source interaction '%s' for constraint", constraint.Source)
 	}
 
-	i.mu.RLock()
+	sourceInteraction.mu.RLock()
 	sourceRequest := sourceInteraction.LastRequest
-	i.mu.RUnlock()
+	sourceInteraction.mu.RUnlock()
 	if sourceRequest == nil {
 		return nil, errors.Errorf("source interaction '%s' as no requests", constraint.Source)
 	}
@@ -343,9 +343,16 @@ func (i *Interaction) EvaluateConstraints(request requestDocument, interactions 
 	result := true
 	violations := make([]string, 0)
 
+	// Don't hold i.mu while evaluating: loading values from a source read-locks the
+	// source, which can be i, and a nested RLock deadlocks once a writer is waiting.
 	i.mu.RLock()
-	defer i.mu.RUnlock()
+	constraints := make([]interactionConstraint, 0, len(i.constraints))
 	for _, constraint := range i.constraints {
+		constraints = append(constraints, constraint)
+	}
+	i.mu.RUnlock()
+
+	for _, constraint := range constraints {
 		expected := constraint.Values
 		if constraint.Source != "" {
 			var err error

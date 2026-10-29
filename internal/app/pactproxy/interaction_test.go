@@ -2,7 +2,10 @@ package pactproxy
 
 import (
 	"encoding/json"
+	"net/url"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -662,6 +665,69 @@ func Test_loadValuesFromSource(t *testing.T) {
 				assert.Nil(t, err)
 			}
 			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestEvaluateConstraintsFromSourceWithConcurrentWrites(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		source string
+	}{
+		{name: "source is another interaction", source: "source"},
+		{name: "source is the same interaction", source: "target"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			source := &Interaction{Description: "source", constraints: map[string]interactionConstraint{}}
+			target := &Interaction{Description: "target", constraints: map[string]interactionConstraint{}}
+			interactions := &Interactions{}
+			interactions.Store(source)
+			interactions.Store(target)
+
+			request, err := ParseJSONRequest([]byte(`{"id": "123"}`), &url.URL{Path: "/v1/resource/123"})
+			require.NoError(t, err)
+			source.StoreRequest(request)
+			target.StoreRequest(request)
+
+			constraint := interactionConstraint{
+				Interaction: "target",
+				Path:        "$.path",
+				Format:      "/v1/resource/%s",
+				Values:      []interface{}{"$.body.id"},
+				Source:      tt.source,
+			}
+			target.AddConstraint(constraint)
+
+			ok, violations := target.EvaluateConstraints(request, interactions)
+			require.True(t, ok, violations)
+
+			done := make(chan struct{})
+			go func() {
+				defer close(done)
+				var wg sync.WaitGroup
+				for n := 0; n < 1000; n++ {
+					wg.Add(3)
+					go func() {
+						defer wg.Done()
+						target.EvaluateConstraints(request, interactions)
+					}()
+					go func() {
+						defer wg.Done()
+						target.AddConstraint(constraint)
+					}()
+					go func() {
+						defer wg.Done()
+						source.StoreRequest(request)
+					}()
+				}
+				wg.Wait()
+			}()
+
+			select {
+			case <-done:
+			case <-time.After(10 * time.Second):
+				t.Fatal("EvaluateConstraints deadlocked with concurrent writes")
+			}
 		})
 	}
 }
